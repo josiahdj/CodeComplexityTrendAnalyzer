@@ -1,6 +1,6 @@
 ﻿namespace CodeComplexityTrendAnalyzer
 
-type RevisionDate = { Hash: string; Date: string }
+type RevisionDate = { Hash: string; Date: string; Author: string }
 
 module Git = 
 
@@ -10,13 +10,13 @@ module Git =
         CommandHelper.getGitResult repoPath
 
     let revs git filePath = 
-        let gitCmd = sprintf "log --date=short --pretty=format:%%h--%%ad %s" filePath
+        let gitCmd = sprintf "log --date=short --pretty=format:%%h--%%ad--%%an %s" filePath
         git gitCmd 
         |> List.rev
 
     let parseRevHashes (commit : string) =
-        let revAndDate = commit.Split("--")
-        { Hash = revAndDate.[0]; Date = revAndDate.[1] }
+        let parts = commit.Split("--")
+        { Hash = parts.[0]; Date = parts.[1]; Author = parts.[2] }
 
     let getFileAtRev git (file : string) rev =
         let theFile = file.Replace("\\", "/")
