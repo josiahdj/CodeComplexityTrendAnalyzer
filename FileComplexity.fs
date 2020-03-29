@@ -22,9 +22,6 @@ type Stats(hash : string, date: string, author: string, values : int list) as th
 
 
 module FileComplexity = 
-    open Fake.IO
-    open Fake.IO.FileSystemOperators
-
     let calculateComplexity lines =
         let lineComplexity (line : string) =
             // count indentations as a proxy for complexity; see: http://softwareprocess.es/static/WhiteSpace.html
@@ -37,11 +34,7 @@ module FileComplexity =
 
         lineComplexities
 
-    let printStats repo file out =
-        let repoPath = DirectoryInfo.ofPath repo
-        let filePath = repoPath.FullName </> file
-        let git = Git.gitResult repoPath.FullName
-
+    let getStats git file =
         let calculateComplexity' revLines =
             let rev, date, author, lines = revLines
             rev, date, author, calculateComplexity lines
@@ -51,7 +44,7 @@ module FileComplexity =
             rev, date, author, Git.getFileAtRev git file rev
 
         let asCsv (stat : Stats) =
-            sprintf "%s,%s,%s,%i,%i,%.2f,%.2f\r\n" stat.Hash stat.Date stat.Author stat.Count stat.Total stat.Mean stat.StdDev
+            sprintf "%s,%s,%s,%i,%i,%.2f,%.2f" stat.Hash stat.Date stat.Author stat.Count stat.Total stat.Mean stat.StdDev
 
         let fileComplexityTrendAsCsv = 
             Git.parseRevHashes 
@@ -60,13 +53,7 @@ module FileComplexity =
             >> Stats 
             >> asCsv 
 
-        let filename = 
-            let fullFilePath = FileInfo.ofPath filePath
-            fullFilePath.Name
-        let outFile = out </> sprintf "%s-FileComplexity.csv" filename
-        let header = sprintf "hash,date,author,num_lines,total_complex,avg_complex,sd\r\n"
-        File.create outFile
-        File.writeString false outFile header
-        Git.revs git filePath
-        |> List.map fileComplexityTrendAsCsv
-        |> List.iter (File.writeString true outFile)
+        seq { 
+            yield sprintf "hash,date,author,num_lines,total_complex,avg_complex,sd"
+            yield! Git.revs git file |> List.map fileComplexityTrendAsCsv
+        }
