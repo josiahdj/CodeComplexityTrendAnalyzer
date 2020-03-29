@@ -21,7 +21,7 @@ type Stats(name : string, date: string, allValues : int list) as this =
 
 
 module FileComplexity = 
-
+    open Fake
     open Fake.IO
     open Fake.IO.FileSystemOperators
 
@@ -37,7 +37,7 @@ module FileComplexity =
 
         lineComplexities
 
-    let printStats repo file =
+    let printStats repo file out =
         let repoPath = DirectoryInfo.ofPath repo
         let filePath = repoPath.FullName </> file
         let git = Git.gitResult repoPath.FullName
@@ -60,7 +60,10 @@ module FileComplexity =
             >> Stats 
             >> asCsv 
 
-        printfn "hash,date,num_lines,total_complex,avg_complex,sd"
+        let filename = Fake.Core.String.splitStr "\/" file |> List.last
+        let outFile = out </> sprintf "%s-FileComplexity.csv" filename
+        let header = sprintf "hash,date,num_lines,total_complex,avg_complex,sd"
+        File.writeString false outFile header
         Git.revs git filePath
         |> List.map fileComplexityTrendAsCsv
-        |> List.iter (printfn "%s")
+        |> List.iter (File.writeString true outFile)
