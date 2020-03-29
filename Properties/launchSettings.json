@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "CodeComplexityTrendAnalyzer": {
+      "commandName": "Project",
+      "commandLineArgs": "C:\\code\\platform-analysis\\ MoboLogic\\src\\Basket.cs"
+    }
+  }
+}
