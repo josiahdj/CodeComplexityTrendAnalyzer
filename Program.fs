@@ -48,7 +48,7 @@ let main argv =
             ss |> Seq.iter (fun (s : string) -> Console.Out.WriteLine(s))
 
         if cmd = All || cmd = Methods then
-            MethodAnalysis.getMethodInfo git repo.FullName file |> writer
+            MethodAnalysis.getMethodInfo git file |> writer
         
         if cmd = All || cmd = Complexity then
             FileComplexity.getStats git file |> writer

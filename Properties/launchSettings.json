@@ -2,7 +2,7 @@
   "profiles": {
     "CodeComplexityTrendAnalyzer": {
       "commandName": "Project",
-      "commandLineArgs": "all --repository-path C:\\code\\platform-analysis\\ -s MoboLogic\\src\\Basket.cs"
+      "commandLineArgs": "methods --repository-path C:\\code\\platform-analysis\\ -s MoboLogic\\src\\Basket.cs"
     }
   }
 }

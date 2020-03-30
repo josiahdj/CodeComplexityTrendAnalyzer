@@ -39,8 +39,8 @@ module FileComplexity =
             let rev, date, author, lines = revLines
             rev, date, author, calculateComplexity lines
 
-        let getFileAtRev' revDate =
-            let { Hash = rev; Date = date; Author = author } = revDate
+        let getFileAtRev' revInfo =
+            let { Hash = rev; Date = date; Author = author } = revInfo
             rev, date, author, Git.getFileAtRev git file rev
 
         let asCsv (stat : Stats) =
