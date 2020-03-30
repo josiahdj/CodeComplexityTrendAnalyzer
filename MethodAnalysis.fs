@@ -1,16 +1,17 @@
 ﻿namespace CodeComplexityTrendAnalyzer
 
-open System
-open Microsoft.CodeAnalysis.Text
-open Microsoft.CodeAnalysis.CSharp
-open System.Linq
-open Microsoft.CodeAnalysis.CSharp.Syntax
-open Microsoft.CodeAnalysis
-open Fake.Core
-
 type MethodRevision = { Revision: RevisionInfo; Member: string }
 
 module MethodAnalysis = 
+    open System
+    open Microsoft.CodeAnalysis.Text
+    open Microsoft.CodeAnalysis.CSharp
+    open System.Linq
+    open Microsoft.CodeAnalysis.CSharp.Syntax
+    open Microsoft.CodeAnalysis
+    open Fake.Core
+    open FSharp.Collections.ParallelSeq
+    
     let getMethodInfo git file =
         let getFileChangesAtRev' (rev : RevisionInfo) =
             let diffs = Git.getFileChangesAtRev git file rev.Hash
@@ -59,16 +60,13 @@ module MethodAnalysis =
             |> List.distinct
             |> List.map (fun m -> { Revision = rev; Member = m })
 
-        let asCsv (methodRevs : MethodRevision list) =
-            let revAsCsv methodRev =
-                sprintf "%s,%s,%s,%s" methodRev.Revision.Hash methodRev.Revision.Date methodRev.Revision.Author methodRev.Member
-            
-            seq {
-                yield sprintf "hash,date,author,member"
-                yield! methodRevs |> List.map revAsCsv
-            }
-
-        Git.revs git file
-        |> List.map (Git.parseRevHashes >> getFileChangesAtRev' >> getFileAtRev' >> getMembers)
-        |> List.collect id
-        |> asCsv
+        let asCsv (methodRev : MethodRevision) =
+            sprintf "%s,%s,%s,%s" methodRev.Revision.Hash methodRev.Revision.Date methodRev.Revision.Author methodRev.Member            
+             
+        seq {
+            yield sprintf "hash,date,author,member"
+            yield! Git.revs git file
+                    |> PSeq.map (Git.parseRevHashes >> getFileChangesAtRev' >> getFileAtRev' >> getMembers)
+                    |> PSeq.collect id
+                    |> PSeq.map asCsv
+        }

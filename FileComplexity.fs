@@ -22,6 +22,8 @@ type Stats(hash : string, date: string, author: string, values : int list) as th
 
 
 module FileComplexity = 
+    open FSharp.Collections.ParallelSeq
+    
     let calculateComplexity lines =
         let lineComplexity (line : string) =
             // count indentations as a proxy for complexity; see: http://softwareprocess.es/static/WhiteSpace.html
@@ -55,5 +57,5 @@ module FileComplexity =
 
         seq { 
             yield sprintf "hash,date,author,num_lines,total_complex,avg_complex,sd"
-            yield! Git.revs git file |> List.map fileComplexityTrendAsCsv
+            yield! Git.revs git file |> PSeq.map fileComplexityTrendAsCsv
         }
