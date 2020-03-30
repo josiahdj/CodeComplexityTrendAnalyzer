@@ -49,7 +49,7 @@ module FileComplexity =
             sprintf "%s,%s,%s,%i,%i,%.2f,%.2f" stat.Hash stat.Date stat.Author stat.Count stat.Total stat.Mean stat.StdDev
 
         let fileComplexityTrendAsCsv = 
-            Git.parseRevHashes 
+            Git.parseRev 
             >> getFileAtRev'
             >> calculateComplexity'
             >> Stats 

@@ -17,7 +17,7 @@ module Git =
         git gitCmd 
         |> List.rev
 
-    let parseRevHashes commit =
+    let parseRev commit =
         let parts = String.splitStr "--" commit
         { Hash = parts.[0]; Date = parts.[1]; Author = parts.[2] }
 
@@ -28,9 +28,7 @@ module Git =
 
     let hunkRegex = Regex("@@ -(?<start_line>[0-9]+)(,(?<line_count>[0-9]+))? \+([0-9]+)(,([0-9]+))?( @@) ?(?<member>.*?)$", RegexOptions.Compiled)
     let getFileChangesAtRev git file rev =
-        let theFile = String.replace "\\" "/" file
-        let gitCmd = sprintf "diff %s --unified=0 -- %s" rev theFile
-        let hunkHeaderStartLine s =
+        let toHunk s =
             let matches = hunkRegex.Match(s)
             if matches.Success && matches.Captures.Count > 0 then
                 let startLine = matches.Groups.["start_line"].Value |> Int32.Parse
@@ -41,8 +39,12 @@ module Git =
                         0
                 let memberName = matches.Groups.["member"].Value
                 Some { File = file; Revision = rev; StartLine = startLine; LineCount = lineCount; MemberName = memberName }
-            else
+            else // a line change
                 None
+
+        let theFile = String.replace "\\" "/" file
+        let gitCmd = sprintf "diff %s --unified=0 -- %s" rev theFile
+
         git gitCmd 
-        |> List.map hunkHeaderStartLine
+        |> List.map toHunk
         |> List.choose id

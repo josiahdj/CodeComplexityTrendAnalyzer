@@ -13,16 +13,21 @@ module MethodAnalysis =
     open FSharp.Collections.ParallelSeq
     
     let getMethodInfo git file =
-        let getFileChangesAtRev' (rev : RevisionInfo) =
+        let parseRevPair (prev, curr) =
+            Git.parseRev prev, Git.parseRev curr
+
+        let getFileChangesAtRev' ((rev, rev') : RevisionInfo * RevisionInfo) =
             let diffs = Git.getFileChangesAtRev git file rev.Hash
-            rev, diffs
+            rev, rev', diffs
 
-        let getFileAtRev' ((rev, diffs) : RevisionInfo * DiffChange list) =
+        let getFileAtRev' ((rev, rev', diffs) : RevisionInfo * RevisionInfo * DiffChange list) =
             let code = Git.getFileAtRev git file rev.Hash |> String.toLines
-            rev, diffs, code
+            let code' = Git.getFileAtRev git file rev'.Hash |> String.toLines
+            rev, diffs, code, code'
 
-        let getMemberName (st : SyntaxTree) lineNum  =
+        let getMemberName (st : SyntaxTree) (st' : SyntaxTree)  (diff : DiffChange) =
             let lines = st.GetText().Lines
+            let lineNum = diff.StartLine
             if lines.Count > lineNum then
                 let span = lines.[lineNum].Span;
                 let members = st.GetRoot().DescendantNodes().OfType<MemberDeclarationSyntax>().Where(fun x -> x.Span.IntersectsWith(span))
@@ -45,17 +50,18 @@ module MethodAnalysis =
                 else None
             else None
 
-        let getMemberName' (code : SyntaxTree) (diff : DiffChange) =
-            getMemberName code diff.StartLine
-
-        let getMembers ((rev, diffs, code) : RevisionInfo * DiffChange list * string) =
+        let getMembers ((rev, diffs, code, code') : RevisionInfo * DiffChange list * string * string) =
             //let expandLines (diff : DiffChange) : int list =
             //    [diff.StartLine..(diff.StartLine + diff.LineCount)]
-            let st = SourceText.From(code);
-            let sf = SyntaxFactory.ParseSyntaxTree(st);
+            let parseCode (code : string) =
+                let st = SourceText.From(code);
+                SyntaxFactory.ParseSyntaxTree(st);
+
+            let sf = parseCode code
+            let sf' = parseCode code'
 
             diffs 
-            |> List.map (getMemberName' sf)
+            |> List.map (getMemberName sf sf')
             |> List.choose id
             |> List.distinct
             |> List.map (fun m -> { Revision = rev; Member = m })
@@ -66,7 +72,8 @@ module MethodAnalysis =
         seq {
             yield sprintf "hash,date,author,member"
             yield! Git.revs git file
-                    |> PSeq.map (Git.parseRevHashes >> getFileChangesAtRev' >> getFileAtRev' >> getMembers)
+                    |> List.pairwise
+                    |> PSeq.map (parseRevPair >> getFileChangesAtRev' >> getFileAtRev' >> getMembers)
                     |> PSeq.collect id
                     |> PSeq.map asCsv
         }
