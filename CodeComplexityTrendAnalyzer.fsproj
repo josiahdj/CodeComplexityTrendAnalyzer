@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Logging.fs" />
     <Compile Include="Strings.fs" />
     <Compile Include="Git.fs" />
     <Compile Include="FileComplexity.fs" />
@@ -17,8 +18,12 @@
     <PackageReference Include="Argu" Version="6.0.0" />
     <PackageReference Include="Fake.Tools.Git" Version="5.19.1" />
     <PackageReference Include="FSharp.Collections.ParallelSeq" Version="1.1.2" />
-    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.0.0-beta2.final" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.0.0" PrivateAssets="all" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="3.5.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="3.1.1" />
+    <PackageReference Include="Serilog.Sinks.File" Version="4.1.0" />
+    <PackageReference Include="Serilog.Sinks.Literate" Version="3.0.0" />
+    <PackageReference Include="Serilog.Sinks.RollingFile" Version="3.3.0" />
   </ItemGroup>
 
   <ItemGroup>

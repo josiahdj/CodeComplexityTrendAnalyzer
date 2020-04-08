@@ -11,6 +11,7 @@ module Git =
     open System.Text.RegularExpressions
     open Fake.Tools.Git
     open Fake.Core
+    open Logging
 
     let gitResult repoPath = 
         CommandHelper.getGitResult repoPath
@@ -84,13 +85,13 @@ module Git =
                     UnchangedLine s
 
     let getFileChangesAtRev git file rev =
-        //printfn "Parsing Hunks from %s, Rev %s =========================================" file rev
+        logger.Debug("Parsing Hunks from {file}, Rev {rev} =========================================", file, rev)
         let toHunks lines =
             let rec toHunks' hunks lineNum lines' = 
                 let parseLine line' =
                     match line' with
                     | LineInfo li -> 
-                            //printfn "LineInfo: %A" li
+                            logger.Debug("LineInfo: @{LineInfo}", li)
                             toHunks' (li::hunks) 0
                     | LineChange lc -> 
                         match hunks with
@@ -98,22 +99,22 @@ module Git =
                             failwith "this shouldn't really happen!"
                         | [curr] ->
                             let l = lineNum + 1
-                            //printfn "Hunk #%i, LineChange %i: %s" hunks.Length l lc.Text
+                            logger.Debug("Hunk #{HunkNumber}, LineChange {LineNumber}: {Line}", hunks.Length, l, lc.Text)
                             let lineChanges = { lc with LineNumber = l }::curr.LineChanges // I know, List.rev is faster, but these should be small, and this is easier than looping through all of the parents and reversing al these lists
                             let newCurr = [{ curr with LineChanges = lineChanges }]
                             toHunks' newCurr l
                         | curr::tail ->
                             let l = lineNum + 1
-                            //printfn "Hunk #%i, LineChange %i: %s" hunks.Length l lc.Text
+                            logger.Debug("Hunk #{HunkNumber}, LineChange {LineNumber}: {Line}", hunks.Length, l, lc.Text)
                             let lineChanges = { lc with LineNumber = l }::curr.LineChanges
                             let newCurr = { curr with LineChanges = lineChanges }::tail
                             toHunks' newCurr l
                     | DiffHeader dh -> 
-                            //printfn "DiffHeader %s" dh
+                            logger.Debug("DiffHeader {DiffHeader}", dh)
                             toHunks' hunks 0
                     | UnchangedLine ul -> 
                             let l = lineNum + 1
-                            //printfn "Hunk #%i, UnchangedLine %i: %s" hunks.Length l ul
+                            logger.Debug("Hunk #{HunkNumber}, UnchangedLine {LineNumber}: {Line}", hunks.Length, l, ul)
                             toHunks' hunks l
 
                 match lines' with
