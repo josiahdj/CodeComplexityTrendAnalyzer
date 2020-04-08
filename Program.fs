@@ -34,9 +34,7 @@ let main argv =
         let cmd = argResults.GetResult Command
         let repo = argResults.PostProcessResult (<@ Repository_Path @>, DirectoryInfo.ofPath)
         let file = argResults.GetResult Source_File
-        let output = argResults.TryGetResult Output_Path 
-                        |> Option.defaultValue (Directory.GetCurrentDirectory()) 
-                        |> DirectoryInfo.ofPath
+        let output = argResults.TryGetResult Output_Path |> Option.map DirectoryInfo.ofPath
 
         let git = Git.gitResult repo.FullName
 
@@ -44,8 +42,9 @@ let main argv =
         //     let fullFilePath = FileInfo.ofPath filePath
         //     fullFilePath.Name
         // let complexityOutFile = out </> sprintf "%s-FileComplexity.csv" outFileName
+        let writeLine s = Console.Out.WriteLine(sprintf "%s" s)
         let writer ss =
-            ss |> Seq.iter (fun (s : string) -> Console.Out.WriteLine(s))
+            ss |> Seq.iter writeLine
 
         if cmd = All || cmd = Methods then
             MethodAnalysis.getMethodInfo git file |> writer
