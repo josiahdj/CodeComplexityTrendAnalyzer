@@ -1,4 +1,4 @@
-namespace CodeComplexityTrendAnalyzer
+﻿namespace CodeComplexityTrendAnalyzer
 
 type RevisionInfo = { Hash: string; Date: string; Author: string }
 type LineChangeOperation = | UnchangedLine | AddLine | RemoveLine
@@ -72,7 +72,7 @@ module Git =
           MemberName = memberName
           LineChanges = []}
 
-    let lineChangeRegex = Regex("^(?<op>\+|\-)(?<line>[^+-].*)$", RegexOptions.Compiled)
+    let lineChangeRegex = Regex("^(?<op>\+|\-)(?<line>[^+-].*?)$", RegexOptions.Compiled) // unfortunately (or fortunately) eliminates add/remove of empty lines
     let isLineChange s =
         let matches = lineChangeRegex.Match(s)
         let isMatch = matches.Success && matches.Groups.Count > 0
