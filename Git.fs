@@ -3,8 +3,8 @@
 type RevisionInfo = { Hash: string; Date: string; Author: string }
 type LineChangeOperation = | LineUnchanged | AddLine | RemoveLine
 type LineChange = { Operation: LineChangeOperation; LineNumber: int; Text: string }
-type LineInfo = { StartLine: int option; StartLineCount: int option; EndLine: int option; EndLineCount: int option; MemberName: string; LineChanges: LineChange list }
-type DiffChange = { File: string; Revision: string; LineInfo: LineInfo }
+type DiffHunk = { BeforeLine: int option; BeforeLineCount: int option; AfterLine: int option; AfterLineCount: int option; MemberName: string option; LineChanges: LineChange list }
+type DiffChange = { File: string; Revision: string; DiffHunk: DiffHunk }
 
 module Git = 
     open System
@@ -29,7 +29,7 @@ module Git =
         let gitCmd = sprintf "show %s:%s" rev theFile
         git gitCmd
 
-    let lineInfoRegex = Regex("@@ -(?<start_line>[0-9]+)(,(?<start_line_count>[0-9]+))? \+(?<end_line>[0-9]+)(,(?<end_line_count>[0-9]+))?( @@) ?(?<member>.*?)$", RegexOptions.Compiled)
+    let lineInfoRegex = Regex("@@ -(?<before_line>[0-9]+)(,(?<before_line_count>[0-9]+))? \+(?<after_line>[0-9]+)(,(?<after_line_count>[0-9]+))?( @@) ?(?<member>.*?)$", RegexOptions.Compiled)
     let isLineInfo s =
         let matches = lineInfoRegex.Match(s)
         let isMatch = matches.Success && matches.Groups.Count > 0
@@ -42,16 +42,16 @@ module Git =
             None
 
     let toLineInfo grps =
-        let memberName = grps |> groupValue "member" |> Option.defaultValue "???"
-        let startLine = grps |> groupValue "start_line" |> Option.map int
-        let startLineCount = grps |> groupValue "start_line_count" |> Option.map int
-        let endLine = grps |> groupValue "end_line" |> Option.map int
-        let endLineCount = grps |> groupValue "end_line_count" |> Option.map int
+        let memberName = grps |> groupValue "member"
+        let beforeLine = grps |> groupValue "before_line" |> Option.map int
+        let beforeLineCount = grps |> groupValue "before_line_count" |> Option.map int
+        let afterLine = grps |> groupValue "after_line" |> Option.map int
+        let afterLineCount = grps |> groupValue "after_line_count" |> Option.map int
         
-        { StartLine = startLine
-          StartLineCount = startLineCount
-          EndLine = endLine
-          EndLineCount = endLineCount
+        { BeforeLine = beforeLine
+          BeforeLineCount = beforeLineCount
+          AfterLine = afterLine
+          AfterLineCount = afterLineCount
           MemberName = memberName
           LineChanges = []}
 
@@ -84,39 +84,49 @@ module Git =
                     UnchangedLine s
 
     let getFileChangesAtRev git file rev =
-
+        printfn "Parsing Hunks from %s, Rev %s =========================================" file rev
         let toHunks lines =
             let rec toHunks' hunks lineNum lines' = 
-                let parseLine line rest =
-                    match line with
-                    | LineInfo li ->  toHunks' (li::hunks) 0 rest
-                    | LineChange cl -> 
+                let parseLine line' =
+                    match line' with
+                    | LineInfo li -> 
+                            printfn "LineInfo: %A" li
+                            toHunks' (li::hunks) 0
+                    | LineChange lc -> 
                         match hunks with
-                        | [] -> failwith "this shouldn't really happen!"
+                        | [] -> 
+                            failwith "this shouldn't really happen!"
                         | [curr] ->
                             let l = lineNum + 1
-                            let lineChanges = { cl with LineNumber = l }::curr.LineChanges
+                            printfn "Hunk #%i, LineChange %i: %s" hunks.Length l lc.Text
+                            let lineChanges = { lc with LineNumber = l }::curr.LineChanges // I know, List.rev is faster, but these should be small, and this is easier than looping through all of the parents and reversing al these lists
                             let newCurr = [{ curr with LineChanges = lineChanges }]
-                            toHunks' newCurr l rest
+                            toHunks' newCurr l
                         | curr::tail ->
                             let l = lineNum + 1
-                            let lineChanges = { cl with LineNumber = l }::curr.LineChanges
+                            printfn "Hunk #%i, LineChange %i: %s" hunks.Length l lc.Text
+                            let lineChanges = { lc with LineNumber = l }::curr.LineChanges
                             let newCurr = { curr with LineChanges = lineChanges }::tail
-                            toHunks' newCurr l rest
-                    | DiffHeader dh -> toHunks' hunks 0 rest
-                    | UnchangedLine ul -> toHunks' hunks (lineNum + 1) rest
+                            toHunks' newCurr l
+                    | DiffHeader dh -> 
+                            printfn "DiffHeader %s" dh
+                            toHunks' hunks 0
+                    | UnchangedLine ul -> 
+                            let l = lineNum + 1
+                            printfn "Hunk #%i, UnchangedLine %i: %s" hunks.Length l ul
+                            toHunks' hunks l
 
                 match lines' with
                 | [] -> hunks // The End
                 | [line] -> parseLine line [] // Last Line -> The End
                 | line::rest -> parseLine line rest
 
-            toHunks' List.empty<LineInfo> 0 lines
+            toHunks' List.empty<DiffHunk> 0 lines
 
         let toFileChanges l =
             { File = file; 
               Revision = rev; 
-              LineInfo = l }
+              DiffHunk = l }
 
         let theFile = String.replace "\\" "/" file
         // let gitCmd = sprintf "diff %s --unified=0 -- %s" rev theFile
@@ -125,3 +135,4 @@ module Git =
         git gitCmd 
         |> toHunks
         |> List.map toFileChanges
+        |> List.rev

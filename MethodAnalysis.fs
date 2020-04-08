@@ -27,7 +27,7 @@ module MethodAnalysis =
 
         let getMemberName (st : SyntaxTree) (st' : SyntaxTree)  (diff : DiffChange) =
             let lines = st.GetText().Lines
-            let lineNum = diff.LineInfo.StartLine |> Option.defaultValue 0
+            let lineNum = diff.DiffHunk.BeforeLine |> Option.defaultValue 0
             if lines.Count > lineNum then
                 let span = lines.[lineNum].Span;
                 let members = st.GetRoot().DescendantNodes().OfType<MemberDeclarationSyntax>().Where(fun x -> x.Span.IntersectsWith(span))
