@@ -27,7 +27,7 @@ module MethodAnalysis =
 
         let getMemberName (st : SyntaxTree) (st' : SyntaxTree)  (diff : DiffChange) =
             let lines = st.GetText().Lines
-            let lineNum = diff.StartLine
+            let lineNum = diff.LineInfo.StartLine |> Option.defaultValue 0
             if lines.Count > lineNum then
                 let span = lines.[lineNum].Span;
                 let members = st.GetRoot().DescendantNodes().OfType<MemberDeclarationSyntax>().Where(fun x -> x.Span.IntersectsWith(span))
@@ -73,7 +73,10 @@ module MethodAnalysis =
             yield sprintf "hash,date,author,member"
             yield! Git.revs git file
                     |> List.pairwise
-                    |> PSeq.map (parseRevPair >> getFileChangesAtRev' >> getFileAtRev' >> getMembers)
-                    |> PSeq.collect id
-                    |> PSeq.map asCsv
+                    |> List.map (parseRevPair >> getFileChangesAtRev' >> getFileAtRev' >> getMembers)
+                    |> List.collect id
+                    |> List.map asCsv
+                    // |> PSeq.map (parseRevPair >> getFileChangesAtRev' >> getFileAtRev' >> getMembers)
+                    // |> PSeq.collect id
+                    // |> PSeq.map asCsv
         }
