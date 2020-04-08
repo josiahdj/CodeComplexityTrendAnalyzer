@@ -44,9 +44,9 @@ module MethodAnalysis =
 
                     let printMember (n : MemberDeclarationSyntax) =
                         match n with 
-                        | :? PropertyDeclarationSyntax as p -> sprintf "Property: %O" p.Identifier
-                        | :? MethodDeclarationSyntax as m -> sprintf "Method: %O" m.Identifier
-                        | :? ConstructorDeclarationSyntax as c -> sprintf "Constructor: %O" c.Identifier
+                        | :? PropertyDeclarationSyntax as p -> tee logger.Debug (sprintf "Property: %O" p.Identifier)
+                        | :? MethodDeclarationSyntax as m -> tee logger.Debug (sprintf "Method: %O" m.Identifier)
+                        | :? ConstructorDeclarationSyntax as c -> tee logger.Debug (sprintf "Constructor: %O" c.Identifier)
                         | _ -> String.Empty
         
                     let notEmpty s =

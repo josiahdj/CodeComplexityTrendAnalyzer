@@ -1,7 +1,6 @@
 ﻿namespace CodeComplexityTrendAnalyzer
 
 open Serilog
-open Serilog.Formatting.Json
 open System
 
 [<AutoOpen>]
@@ -9,6 +8,9 @@ module Logging =
     let logger = LoggerConfiguration()
                     .MinimumLevel.Debug()
                     .WriteTo.LiterateConsole()
-                    .WriteTo.RollingFile(JsonFormatter(), "CodeComplexityTrendAnalyzer-{Date}.log", retainedFileCountLimit = Nullable 3)
+                    .WriteTo.RollingFile("CodeComplexityTrendAnalyzer-{Date}.log", retainedFileCountLimit = Nullable 3)
                     .CreateLogger();
+    let tee f x =
+        f x
+        x
 
