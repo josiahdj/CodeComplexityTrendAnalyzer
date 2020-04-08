@@ -16,21 +16,33 @@ module MethodAnalysis =
         let parseRevPair (prev, curr) =
             Git.parseRev prev, Git.parseRev curr
 
-        let getFileChangesAtRev' ((rev, rev') : RevisionInfo * RevisionInfo) =
-            let diffs = Git.getFileChangesAtRev git file rev.Hash
-            rev, rev', diffs
+        let memoize f =
+            let cache = ref Map.empty
+            fun x ->
+                match (!cache).TryFind(x) with
+                | Some res -> res
+                | None ->
+                    let res = f x
+                    cache := (!cache).Add(x,res)
+                    res
 
-        let getFileAtRev' ((rev, rev', diffs) : RevisionInfo * RevisionInfo * DiffChange list) =
-            let code = Git.getFileAtRev git file rev.Hash |> String.toLines
-            let code' = Git.getFileAtRev git file rev'.Hash |> String.toLines
-            rev, diffs, code, code'
+        let getFileChangesAtRevMemoized = memoize (Git.getFileChangesAtRev git file)
+        let getFileChangesAtRev' ((revBefore, refAfter) : RevisionInfo * RevisionInfo) =
+            let diffs = getFileChangesAtRevMemoized revBefore.Hash
+            revBefore, refAfter, diffs
 
-        let getMemberName (st : SyntaxTree) (st' : SyntaxTree)  (diff : DiffChange) =
-            let lines = st.GetText().Lines
+        let getFileAtRevMemoized = memoize (Git.getFileAtRev git file)
+        let getFileAtRev' ((revBefore, revAfter, diffs) : RevisionInfo * RevisionInfo * DiffChange list) =
+            let codeBefore = getFileAtRevMemoized revBefore.Hash |> String.toLines
+            let codeAfter = getFileAtRevMemoized revAfter.Hash |> String.toLines
+            revBefore, diffs, codeBefore, codeAfter
+
+        let getMemberName (stBefore : SyntaxTree) (stAfter' : SyntaxTree)  (diff : DiffChange) =
+            let lines = stBefore.GetText().Lines
             let lineNum = diff.DiffHunk.BeforeLine |> Option.defaultValue 0
             if lines.Count > lineNum then
                 let span = lines.[lineNum].Span;
-                let members = st.GetRoot().DescendantNodes().OfType<MemberDeclarationSyntax>().Where(fun x -> x.Span.IntersectsWith(span))
+                let members = stBefore.GetRoot().DescendantNodes().OfType<MemberDeclarationSyntax>().Where(fun x -> x.Span.IntersectsWith(span))
 
                 let printMember (n : MemberDeclarationSyntax) =
                     match n with 
@@ -50,15 +62,15 @@ module MethodAnalysis =
                 else None
             else None
 
-        let getMembers ((rev, diffs, code, code') : RevisionInfo * DiffChange list * string * string) =
+        let getMembers ((rev, diffs, codeBefore, codeAfter) : RevisionInfo * DiffChange list * string * string) =
             //let expandLines (diff : DiffChange) : int list =
             //    [diff.StartLine..(diff.StartLine + diff.LineCount)]
             let parseCode (code : string) =
                 let st = SourceText.From(code);
                 SyntaxFactory.ParseSyntaxTree(st);
 
-            let sf = parseCode code
-            let sf' = parseCode code'
+            let sf = parseCode codeBefore
+            let sf' = parseCode codeAfter
 
             diffs 
             |> List.map (getMemberName sf sf')
@@ -72,7 +84,7 @@ module MethodAnalysis =
         seq {
             yield sprintf "hash,date,author,member"
             yield! Git.revs git file
-                    |> List.pairwise
+                    |> List.pairwise // TODO: pulling each diff and file twice this way? Cache them (limit size to 1?), pull from cache second time.
                     |> List.map (parseRevPair >> getFileChangesAtRev' >> getFileAtRev' >> getMembers)
                     |> List.collect id
                     |> List.map asCsv

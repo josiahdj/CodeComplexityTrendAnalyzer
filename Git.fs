@@ -129,8 +129,8 @@ module Git =
               DiffHunk = l }
 
         let theFile = String.replace "\\" "/" file
-        // let gitCmd = sprintf "diff %s --unified=0 -- %s" rev theFile
-        let gitCmd = sprintf "diff %s -- %s" rev theFile
+        let gitCmd = sprintf "diff %s --unified=0 -- %s" rev theFile
+        // let gitCmd = sprintf "diff %s -- %s" rev theFile
 
         git gitCmd 
         |> toHunks
