@@ -4,6 +4,7 @@ open Serilog
 open Serilog.Formatting.Json
 open System
 
+[<AutoOpen>]
 module Logging =
     let logger = LoggerConfiguration()
                     .MinimumLevel.Debug()

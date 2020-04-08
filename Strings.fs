@@ -1,5 +1,6 @@
 ﻿namespace CodeComplexityTrendAnalyzer
 
+[<RequireQualifiedAccess>]
 module Strings =
     open System
     open System.Text.RegularExpressions

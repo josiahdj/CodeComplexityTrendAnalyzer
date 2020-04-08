@@ -1,4 +1,4 @@
-﻿namespace CodeComplexityTrendAnalyzer
+namespace CodeComplexityTrendAnalyzer
 
 type MethodRevision = { Revision: RevisionInfo; Member: string }
 
@@ -10,7 +10,6 @@ module MethodAnalysis =
     open Microsoft.CodeAnalysis.CSharp.Syntax
     open Microsoft.CodeAnalysis
     open Fake.Core
-    open FSharp.Collections.ParallelSeq
     
     let getMethodInfo git file =
         let parseRevPair (prev, curr) =
@@ -37,30 +36,48 @@ module MethodAnalysis =
             let codeAfter = getFileAtRevMemoized revAfter.Hash |> String.toLines
             revBefore, diffs, codeBefore, codeAfter
 
-        let getMemberName (stBefore : SyntaxTree) (stAfter' : SyntaxTree)  (diff : DiffChange) =
-            let lines = stBefore.GetText().Lines
-            let lineNum = diff.DiffHunk.BeforeLine |> Option.defaultValue 0
-            if lines.Count > lineNum then
-                let span = lines.[lineNum].Span;
-                let members = stBefore.GetRoot().DescendantNodes().OfType<MemberDeclarationSyntax>().Where(fun x -> x.Span.IntersectsWith(span))
+        let getMemberName (stBefore : SyntaxTree) (stAfter : SyntaxTree)  (diff : DiffChange) =
+            let getMemberName' (lines : TextLineCollection) lineNumber =
+                if lines.Count > lineNumber then
+                    let span = lines.[lineNumber].Span;
+                    let members = stBefore.GetRoot().DescendantNodes().OfType<MemberDeclarationSyntax>().Where(fun x -> x.Span.IntersectsWith(span))
 
-                let printMember (n : MemberDeclarationSyntax) =
-                    match n with 
-                    | :? PropertyDeclarationSyntax as p -> sprintf "Property: %O" p.Identifier
-                    | :? MethodDeclarationSyntax as m -> sprintf "Method: %O" m.Identifier
-                    | :? ConstructorDeclarationSyntax as c -> sprintf "Constructor: %O" c.Identifier
-                    | _ -> String.Empty
+                    let printMember (n : MemberDeclarationSyntax) =
+                        match n with 
+                        | :? PropertyDeclarationSyntax as p -> sprintf "Property: %O" p.Identifier
+                        | :? MethodDeclarationSyntax as m -> sprintf "Method: %O" m.Identifier
+                        | :? ConstructorDeclarationSyntax as c -> sprintf "Constructor: %O" c.Identifier
+                        | _ -> String.Empty
         
-                let notEmpty s =
-                    s <> String.Empty
+                    let notEmpty s =
+                        s <> String.Empty
 
-                if members.Any() then
-                    members 
-                    |> Seq.map printMember 
-                    |> Seq.filter notEmpty
-                    |> Seq.tryHead
+                    if members.Any() then
+                        members 
+                        |> Seq.map printMember 
+                        |> Seq.filter notEmpty
+                        |> Seq.tryHead
+                    else None
                 else None
-            else None
+
+            let beforeLines = stBefore.GetText().Lines
+            let afterLines = stAfter.GetText().Lines
+            let getLines op = 
+                match op with 
+                | AddLine -> afterLines
+                | RemoveLine -> beforeLines
+                | UnchangedLine -> afterLines
+
+            match diff.DiffHunk.LineChanges with
+                | [] -> None
+                | [lineChange] -> 
+                        let lineNumber = LineChange.toAbsolutePosition diff.DiffHunk lineChange
+                        let lines = getLines lineChange.Operation
+                        getMemberName' lines lineNumber
+                | lineChange::rest -> 
+                        let lineNumber = LineChange.toAbsolutePosition diff.DiffHunk lineChange
+                        let lines = getLines lineChange.Operation
+                        getMemberName' lines lineNumber
 
         let getMembers ((rev, diffs, codeBefore, codeAfter) : RevisionInfo * DiffChange list * string * string) =
             //let expandLines (diff : DiffChange) : int list =
@@ -88,7 +105,4 @@ module MethodAnalysis =
                     |> List.map (parseRevPair >> getFileChangesAtRev' >> getFileAtRev' >> getMembers)
                     |> List.collect id
                     |> List.map asCsv
-                    // |> PSeq.map (parseRevPair >> getFileChangesAtRev' >> getFileAtRev' >> getMembers)
-                    // |> PSeq.collect id
-                    // |> PSeq.map asCsv
         }

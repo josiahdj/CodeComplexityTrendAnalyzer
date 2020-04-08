@@ -1,11 +1,27 @@
-﻿namespace CodeComplexityTrendAnalyzer
+namespace CodeComplexityTrendAnalyzer
 
 type RevisionInfo = { Hash: string; Date: string; Author: string }
-type LineChangeOperation = | LineUnchanged | AddLine | RemoveLine
+type LineChangeOperation = | UnchangedLine | AddLine | RemoveLine
 type LineChange = { Operation: LineChangeOperation; LineNumber: int; Text: string }
 type DiffHunk = { BeforeLine: int option; BeforeLineCount: int option; AfterLine: int option; AfterLineCount: int option; MemberName: string option; LineChanges: LineChange list }
 type DiffChange = { File: string; Revision: string; DiffHunk: DiffHunk }
 
+[<RequireQualifiedAccess>]
+module LineChange =
+    let toAbsolutePosition diff lineChange =
+        let op = lineChange.Operation
+        let startLineForOp =
+            match op with
+            | AddLine -> diff.AfterLine |> Option.defaultValue 0
+            | RemoveLine -> diff.BeforeLine |> Option.defaultValue 0
+            | UnchangedLine -> diff.AfterLine |> Option.defaultValue 0
+
+        match op with
+        | AddLine -> startLineForOp + lineChange.LineNumber
+        | RemoveLine -> startLineForOp + lineChange.LineNumber
+        | UnchangedLine -> startLineForOp + lineChange.LineNumber
+
+[<RequireQualifiedAccess>]
 module Git = 
     open System
     open System.Text.RegularExpressions
@@ -63,7 +79,7 @@ module Git =
         (isMatch, matches.Groups)
 
     let toLineChange grps =
-        let op = grps |> groupValue "op" |> Option.map (fun s -> match s with | "+" -> AddLine | "-" -> RemoveLine | _ -> LineUnchanged) |> Option.get
+        let op = grps |> groupValue "op" |> Option.map (fun s -> match s with | "+" -> AddLine | "-" -> RemoveLine | _ -> UnchangedLine) |> Option.get
         let line = grps |> groupValue "line" |> Option.defaultValue String.Empty
         { Operation = op; LineNumber = 0; Text = line }
 
