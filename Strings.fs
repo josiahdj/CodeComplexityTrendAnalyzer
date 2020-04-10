@@ -8,6 +8,7 @@ module Strings =
     open Fake.Core
 
     let splitLines s = String.splitStr "\r\n" s
+
     let countLeadingWhitespace (s : string) = s.TakeWhile(Char.IsWhiteSpace).Count()
 
     let emptyLineRegex = Regex("^\s*$", RegexOptions.Compiled)

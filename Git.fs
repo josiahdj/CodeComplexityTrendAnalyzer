@@ -1,4 +1,4 @@
-﻿namespace CodeComplexityTrendAnalyzer
+namespace CodeComplexityTrendAnalyzer
 
 type RevisionInfo = { Hash: string; Date: string; Author: string }
 type LineChangeOperation = | UnchangedLine | AddLine | RemoveLine
@@ -100,8 +100,8 @@ module Git =
                 else
                     UnchangedLine s
 
-    let getFileChangesAtRev git file rev =
-        logger.Debug("Parsing Hunks from {file}, Rev {rev} =========================================", file, rev)
+    let getFileChangesAtRev git file revBefore revAfter =
+        logger.Debug("Parsing Hunks from {File}, Rev {RevBefore} to Rev {RevAfter} =========================================", file, revBefore, revAfter)
         let toHunks lines =
             let rec toHunks' hunks lineNum lines' = 
                 let parseLine line' =
@@ -142,12 +142,11 @@ module Git =
 
         let toFileChanges l =
             { File = file; 
-              Revision = rev; 
+              Revision = revBefore; 
               DiffHunk = l }
 
         let theFile = String.replace "\\" "/" file
-        let gitCmd = sprintf "diff %s --unified=0 -- %s" rev theFile
-        // let gitCmd = sprintf "diff %s -- %s" rev theFile
+        let gitCmd = sprintf "diff %s..%s --unified=0 -- %s" revBefore revAfter theFile
 
         git gitCmd 
         |> toHunks

@@ -26,9 +26,9 @@ module MethodAnalysis =
                     res
 
         let getFileChangesAtRevMemoized = memoize (Git.getFileChangesAtRev git file)
-        let getFileChangesAtRev' ((revBefore, refAfter) : RevisionInfo * RevisionInfo) =
-            let diffs = getFileChangesAtRevMemoized revBefore.Hash
-            revBefore, refAfter, diffs
+        let getFileChangesAtRev' ((revBefore, revAfter) : RevisionInfo * RevisionInfo) =
+            let diffs = getFileChangesAtRevMemoized revBefore.Hash revAfter.Hash
+            revBefore, revAfter, diffs
 
         let getFileAtRevMemoized = memoize (Git.getFileAtRev git file)
         let getFileAtRev' ((revBefore, revAfter, diffs) : RevisionInfo * RevisionInfo * DiffChange list) =
