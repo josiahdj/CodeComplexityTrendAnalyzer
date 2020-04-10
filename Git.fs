@@ -103,6 +103,7 @@ module Git =
     let getFileChangesAtRev git file revBefore revAfter =
         logger.Debug("Parsing Hunks from {File}, Rev {RevBefore} to Rev {RevAfter} =========================================", file, revBefore, revAfter)
         let toHunks lines =
+            //dumpToFile (sprintf "%s-%s--%s.diff" file revBefore revAfter) lines
             let rec toHunks' hunks lineNum lines' = 
                 let parseLine line' =
                     match line' with

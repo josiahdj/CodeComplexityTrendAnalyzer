@@ -33,7 +33,9 @@ module MethodAnalysis =
         let getFileAtRevMemoized = memoize (Git.getFileAtRev git file)
         let getFileAtRev' ((revBefore, revAfter, diffs) : RevisionInfo * RevisionInfo * DiffChange list) =
             let codeBefore = getFileAtRevMemoized revBefore.Hash |> String.toLines
+            //dumpToFile (sprintf "%s-Before-%s.cs" file revBefore.Hash) (Strings.splitLines codeBefore)
             let codeAfter = getFileAtRevMemoized revAfter.Hash |> String.toLines
+            //dumpToFile (sprintf "%s-After-%s.cs" file revAfter.Hash) (Strings.splitLines codeAfter)
             revBefore, diffs, codeBefore, codeAfter
 
         let getMemberName (stBefore : SyntaxTree) (stAfter : SyntaxTree)  (diff : DiffChange) =
