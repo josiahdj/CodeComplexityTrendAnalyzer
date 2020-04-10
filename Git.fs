@@ -1,4 +1,4 @@
-namespace CodeComplexityTrendAnalyzer
+﻿namespace CodeComplexityTrendAnalyzer
 
 type RevisionInfo = { Hash: string; Date: string; Author: string }
 type LineChangeOperation = | UnchangedLine | AddLine | RemoveLine
@@ -9,17 +9,15 @@ type DiffChange = { File: string; Revision: string; DiffHunk: DiffHunk }
 [<RequireQualifiedAccess>]
 module LineChange =
     let toAbsolutePosition diff lineChange =
-        let op = lineChange.Operation
-        let startLineForOp =
+        let startLineForOp op =
             match op with
-            | AddLine -> diff.AfterLine |> Option.defaultValue 0
-            | RemoveLine -> diff.BeforeLine |> Option.defaultValue 0
-            | UnchangedLine -> diff.AfterLine |> Option.defaultValue 0
-
-        match op with
-        | AddLine -> startLineForOp + lineChange.LineNumber
-        | RemoveLine -> startLineForOp + lineChange.LineNumber
-        | UnchangedLine -> startLineForOp + lineChange.LineNumber
+            | AddLine -> diff.AfterLine 
+            | RemoveLine -> diff.BeforeLine 
+            | UnchangedLine -> diff.AfterLine 
+            |> Option.defaultValue 0
+        
+        let startLine = startLineForOp lineChange.Operation
+        startLine + lineChange.LineNumber - 1
 
 [<RequireQualifiedAccess>]
 module Git = 
@@ -101,7 +99,7 @@ module Git =
                     UnchangedLine s
 
     let getFileChangesAtRev git file revBefore revAfter =
-        logger.Debug("Parsing Hunks from {File}, Rev {RevBefore} to Rev {RevAfter} =========================================", file, revBefore, revAfter)
+        logger.Information("Parsing Hunks from {File}, Rev {RevBefore} to Rev {RevAfter} =========================================", file, revBefore, revAfter)
         let toHunks lines =
             //dumpToFile (sprintf "%s-%s--%s.diff" file revBefore revAfter) lines
             let rec toHunks' hunks lineNum lines' = 

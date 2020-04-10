@@ -1,7 +1,7 @@
 ﻿open CodeComplexityTrendAnalyzer
 open Argu
 open Fake.IO
-open System.IO
+open Fake.IO.FileSystemOperators
 open System
 
 type CliCommand =
@@ -12,7 +12,7 @@ type CliArguments =
     | [<MainCommand; ExactlyOnce; First>] Command of command : CliCommand
     | [<Mandatory; AltCommandLine("-r")>] Repository_Path of repo : string
     | [<Mandatory; AltCommandLine("-s")>] Source_File of file : string
-    | [<AltCommandLine("-o")>] Output_Path of output : string
+    | [<AltCommandLine("-o")>] Output_File
 with 
     interface IArgParserTemplate with
         member x.Usage =
@@ -20,7 +20,7 @@ with
             | Command _ -> "Choose 'methods' to analyze the methods; choose 'complexity' to return the complexity trend; choose 'all' to run both."
             | Repository_Path _ -> "Specify a repository path, e.g. C:\repo_root_dir"
             | Source_File _ -> "Specify a source file to be analyzed. The path is relalive to the repository directory, e.g. path/to/file.ext"
-            | Output_Path _ -> "The output directory. The analysis files will be named after the source file. If not given, the current directory will be used."
+            | Output_File _ -> "Output results to a file. The analysis files will be named after the source file. The binary's directory will be used."
 
 [<EntryPoint>]
 let main argv =
@@ -34,22 +34,40 @@ let main argv =
         let cmd = argResults.GetResult Command
         let repo = argResults.PostProcessResult (<@ Repository_Path @>, DirectoryInfo.ofPath)
         let file = argResults.GetResult Source_File
-        let output = argResults.TryGetResult Output_Path |> Option.map DirectoryInfo.ofPath
+        let output = argResults.Contains Output_File
 
         let git = Git.gitResult repo.FullName
 
-        // let outFileName = 
-        //     let fullFilePath = FileInfo.ofPath filePath
-        //     fullFilePath.Name
-        // let complexityOutFile = out </> sprintf "%s-FileComplexity.csv" outFileName
-        let writeLine s = Console.Out.WriteLine(sprintf "%s" s)
-        let writer ss =
-            ss |> Seq.iter writeLine
+        let outputName n = 
+            if output then
+                let fileInfo = FileInfo.ofPath file
+                let newFileInfo =  FileInfo.ofPath (fileInfo.Directory.FullName </> (sprintf "%s-%s.csv" n fileInfo.Name))
+                Directory.ensure newFileInfo.Directory.FullName
+                File.create newFileInfo.FullName
+                newFileInfo.FullName
+            else 
+                n
+
+        let writeLine name s = 
+            match output with
+            | true -> appendToFile name s
+            | false -> Console.Out.WriteLine(sprintf "%s: %s" name s)
+
+        let writer name ss =
+            ss |> Seq.iter (writeLine (outputName name))
+
+        let printDone n =
+            let out = outputName n
+            if output then Console.Out.WriteLine("Done. Check for output file {0}", out)
+            else Console.Out.WriteLine("Done with {0}.", out)
 
         if cmd = All || cmd = Methods then
-            MethodAnalysis.getMethodInfo git file |> writer
+            MethodAnalysis.getMethodInfo git file |> writer (nameof MethodAnalysis)
+            printDone "MethodAnalysis"
         
         if cmd = All || cmd = Complexity then
-            FileComplexity.getStats git file |> writer
+            FileComplexity.getStats git file |> writer (nameof FileComplexity)
+            printDone "FileComplexity"
+
 
         0 // return an integer exit code

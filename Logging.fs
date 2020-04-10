@@ -8,7 +8,7 @@ open Fake.IO
 module Logging =
     let logger = LoggerConfiguration()
                     .MinimumLevel.Debug()
-                    .WriteTo.LiterateConsole()
+                    .WriteTo.LiterateConsole(restrictedToMinimumLevel = Events.LogEventLevel.Information)
                     .WriteTo.RollingFile("CodeComplexityTrendAnalyzer-{Date}.log", retainedFileCountLimit = Nullable 3)
                     .CreateLogger();
     let tee f x =
@@ -20,3 +20,6 @@ module Logging =
         Directory.ensure file.Directory.FullName
         File.create file.FullName
         File.write false file.FullName text
+
+    let appendToFile file text =
+        File.writeString true file (text + "\r\n")

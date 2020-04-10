@@ -38,11 +38,11 @@ module MethodAnalysis =
             //dumpToFile (sprintf "%s-After-%s.cs" file revAfter.Hash) (Strings.splitLines codeAfter)
             revBefore, diffs, codeBefore, codeAfter
 
-        let getMemberName (stBefore : SyntaxTree) (stAfter : SyntaxTree)  (diff : DiffChange) =
-            let getMemberName' (lines : TextLineCollection) lineNumber =
+        let getMemberName (astBefore : SyntaxTree) (astAfter : SyntaxTree)  (diff : DiffChange) =
+            let getMemberName' (lines : TextLineCollection) (ast : SyntaxTree) lineNumber =
                 if lines.Count > lineNumber then
                     let span = lines.[lineNumber].Span;
-                    let members = stBefore.GetRoot().DescendantNodes().OfType<MemberDeclarationSyntax>().Where(fun x -> x.Span.IntersectsWith(span))
+                    let members = ast.GetRoot().DescendantNodes().OfType<MemberDeclarationSyntax>().Where(fun x -> x.Span.IntersectsWith(span))
 
                     let printMember (n : MemberDeclarationSyntax) =
                         match n with 
@@ -62,41 +62,40 @@ module MethodAnalysis =
                     else None
                 else None
 
-            let beforeLines = stBefore.GetText().Lines
-            let afterLines = stAfter.GetText().Lines
-            let getLines op = 
+            let beforeLines = astBefore.GetText().Lines
+            let afterLines = astAfter.GetText().Lines
+            let getSource op = 
                 match op with 
-                | AddLine -> afterLines
-                | RemoveLine -> beforeLines
-                | UnchangedLine -> afterLines
+                | AddLine -> afterLines, astAfter
+                | RemoveLine -> beforeLines, astBefore
+                | UnchangedLine -> afterLines, astAfter
 
             match diff.DiffHunk.LineChanges with
                 | [] -> None
                 | [lineChange] -> 
                         let lineNumber = LineChange.toAbsolutePosition diff.DiffHunk lineChange
-                        let lines = getLines lineChange.Operation
-                        getMemberName' lines lineNumber
+                        let (lines, ast) = getSource lineChange.Operation
+                        getMemberName' lines ast lineNumber
                 | lineChange::rest -> 
                         let lineNumber = LineChange.toAbsolutePosition diff.DiffHunk lineChange
-                        let lines = getLines lineChange.Operation
-                        getMemberName' lines lineNumber
+                        let (lines, ast) = getSource lineChange.Operation
+                        getMemberName' lines ast lineNumber
 
         let getMembers ((rev, diffs, codeBefore, codeAfter) : RevisionInfo * DiffChange list * string * string) =
-            //let expandLines (diff : DiffChange) : int list =
-            //    [diff.StartLine..(diff.StartLine + diff.LineCount)]
             let parseCode (code : string) =
                 let st = SourceText.From(code);
                 SyntaxFactory.ParseSyntaxTree(st);
 
-            let sf = parseCode codeBefore
-            let sf' = parseCode codeAfter
+            let astBefore = parseCode codeBefore
+            let astAfter = parseCode codeAfter
 
             diffs 
-            |> List.map (getMemberName sf sf')
+            |> List.map (getMemberName astBefore astAfter)
             |> List.choose id
             |> List.distinct
             |> List.map (fun m -> { Revision = rev; Member = m })
-
+            |> tee (fun ms -> logger.Information("Found {MemberCount} members in Revision {Revision} by {Author} on {Date}", ms.Length, rev.Hash, rev.Author, rev.Date))
+ 
         let asCsv (methodRev : MethodRevision) =
             sprintf "%s,%s,%s,%s" methodRev.Revision.Hash methodRev.Revision.Date methodRev.Revision.Author methodRev.Member            
              
