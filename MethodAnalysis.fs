@@ -1,6 +1,6 @@
 namespace CodeComplexityTrendAnalyzer
 
-type MethodRevision = { Revision: RevisionInfo; Member: string }
+type MethodRevision = { Revision: RevisionInfo; Member: string; LinesAdded: int; LinesRemoved: int }
 
 module MethodAnalysis = 
     open System
@@ -68,18 +68,18 @@ module MethodAnalysis =
                 match op with 
                 | AddLine -> afterLines, astAfter
                 | RemoveLine -> beforeLines, astBefore
-                | UnchangedLine -> afterLines, astAfter
+                | LeaveLine -> afterLines, astAfter
 
             match diff.DiffHunk.LineChanges with
-                | [] -> None
+                | [] -> diff, None
                 | [lineChange] -> 
                         let lineNumber = LineChange.toAbsolutePosition diff.DiffHunk lineChange
                         let (lines, ast) = getSource lineChange.Operation
-                        getMemberName' lines ast lineNumber
+                        diff, getMemberName' lines ast lineNumber
                 | lineChange::rest -> 
                         let lineNumber = LineChange.toAbsolutePosition diff.DiffHunk lineChange
                         let (lines, ast) = getSource lineChange.Operation
-                        getMemberName' lines ast lineNumber
+                        diff, getMemberName' lines ast lineNumber
 
         let getMembers ((rev, diffs, codeBefore, codeAfter) : RevisionInfo * DiffChange list * string * string) =
             let parseCode (code : string) =
@@ -91,16 +91,17 @@ module MethodAnalysis =
 
             diffs 
             |> List.map (getMemberName astBefore astAfter)
-            |> List.choose id
-            |> List.distinct
-            |> List.map (fun m -> { Revision = rev; Member = m })
+            |> List.choose (fun (d,s) -> match s with | Some st -> Some(d,st) | None -> None)
+            |> List.distinctBy (fun (d,s) -> s)
+            |> List.map (fun (d,m) -> { Revision = rev; Member = m; LinesAdded = d.DiffHunk.LinesAdded; LinesRemoved = d.DiffHunk.LinesRemoved })
             |> tee (fun ms -> logger.Information("Found {MemberCount} members in Revision {Revision} by {Author} on {Date}", ms.Length, rev.Hash, rev.Author, rev.Date))
  
         let asCsv (methodRev : MethodRevision) =
-            sprintf "%s,%s,%s,%s" methodRev.Revision.Hash methodRev.Revision.Date methodRev.Revision.Author methodRev.Member            
+            let revision = methodRev.Revision
+            sprintf "%s,%s,%s,%s,%i,%i" revision.Hash revision.Date revision.Author methodRev.Member methodRev.LinesAdded methodRev.LinesRemoved
              
         seq {
-            yield sprintf "hash,date,author,member"
+            yield sprintf "hash,date,author,member,added,removed"
             yield! Git.revs git file
                     |> List.pairwise // TODO: pulling each diff and file twice this way? Cache them (limit size to 1?), pull from cache second time.
                     |> List.map (parseRevPair >> getFileChangesAtRev' >> getFileAtRev' >> getMembers)

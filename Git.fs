@@ -1,9 +1,17 @@
 ﻿namespace CodeComplexityTrendAnalyzer
 
 type RevisionInfo = { Hash: string; Date: string; Author: string }
-type LineChangeOperation = | UnchangedLine | AddLine | RemoveLine
+type LineChangeOperation = | LeaveLine | AddLine | RemoveLine
 type LineChange = { Operation: LineChangeOperation; LineNumber: int; Text: string }
-type DiffHunk = { BeforeLine: int option; BeforeLineCount: int option; AfterLine: int option; AfterLineCount: int option; MemberName: string option; LineChanges: LineChange list }
+type DiffHunk = { 
+    BeforeLine: int option
+    BeforeLineCount: int option
+    AfterLine: int option
+    AfterLineCount: int option
+    MemberName: string option
+    LineChanges: LineChange list
+    LinesAdded: int
+    LinesRemoved: int }
 type DiffChange = { File: string; Revision: string; DiffHunk: DiffHunk }
 
 [<RequireQualifiedAccess>]
@@ -13,7 +21,7 @@ module LineChange =
             match op with
             | AddLine -> diff.AfterLine 
             | RemoveLine -> diff.BeforeLine 
-            | UnchangedLine -> diff.AfterLine 
+            | LeaveLine -> diff.AfterLine 
             |> Option.defaultValue 0
         
         let startLine = startLineForOp lineChange.Operation
@@ -68,7 +76,9 @@ module Git =
           AfterLine = afterLine
           AfterLineCount = afterLineCount
           MemberName = memberName
-          LineChanges = []}
+          LineChanges = []
+          LinesAdded = 0
+          LinesRemoved = 0}
 
     let lineChangeRegex = Regex("^(?<op>\+|\-)(?<line>[^+-].*?)$", RegexOptions.Compiled) // unfortunately (or fortunately) eliminates add/remove of empty lines
     let isLineChange s =
@@ -77,7 +87,7 @@ module Git =
         (isMatch, matches.Groups)
 
     let toLineChange grps =
-        let op = grps |> groupValue "op" |> Option.map (fun s -> match s with | "+" -> AddLine | "-" -> RemoveLine | _ -> UnchangedLine) |> Option.get
+        let op = grps |> groupValue "op" |> Option.map (fun s -> match s with | "+" -> AddLine | "-" -> RemoveLine | _ -> LeaveLine) |> Option.get
         let line = grps |> groupValue "line" |> Option.defaultValue String.Empty
         { Operation = op; LineNumber = 0; Text = line }
 
@@ -103,6 +113,16 @@ module Git =
         let toHunks lines =
             //dumpToFile (sprintf "%s-%s--%s.diff" file revBefore revAfter) lines
             let rec toHunks' hunks lineNum lines' = 
+                let updateDiffHunk dh chg dhs ln =
+                    let added, removed = 
+                        match chg.Operation with
+                        | AddLine -> dh.LinesAdded + 1, dh.LinesRemoved
+                        | RemoveLine -> dh.LinesAdded, dh.LinesRemoved + 1
+                        | LeaveLine -> dh.LinesAdded, dh.LinesRemoved
+
+                    let lineChanges = { chg with LineNumber = ln }::dh.LineChanges // NOTE: line changes will be in reverse order!
+                    { dh with LineChanges = lineChanges; LinesAdded = added; LinesRemoved = removed }::dhs
+
                 let parseLine line' =
                     match line' with
                     | LineInfo li -> 
@@ -115,14 +135,12 @@ module Git =
                         | [curr] ->
                             let l = lineNum + 1
                             logger.Debug("Hunk #{HunkNumber}, LineChange {LineNumber}: {Line}", hunks.Length, l, lc.Text)
-                            let lineChanges = { lc with LineNumber = l }::curr.LineChanges // I know, List.rev is faster, but these should be small, and this is easier than looping through all of the parents and reversing al these lists
-                            let newCurr = [{ curr with LineChanges = lineChanges }]
+                            let newCurr = updateDiffHunk curr lc [] l
                             toHunks' newCurr l
                         | curr::tail ->
                             let l = lineNum + 1
                             logger.Debug("Hunk #{HunkNumber}, LineChange {LineNumber}: {Line}", hunks.Length, l, lc.Text)
-                            let lineChanges = { lc with LineNumber = l }::curr.LineChanges
-                            let newCurr = { curr with LineChanges = lineChanges }::tail
+                            let newCurr = updateDiffHunk curr lc tail l
                             toHunks' newCurr l
                     | DiffHeader dh -> 
                             logger.Debug("DiffHeader {DiffHeader}", dh)
