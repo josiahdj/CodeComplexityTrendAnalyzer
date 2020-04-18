@@ -21,7 +21,7 @@ type Stats(hash : string, date: string, author: string, values : int list) as th
     member private _._SafeDenomenator with get () = if count = 0 then 1 else count
 
 
-module FileComplexity = 
+module FileAnalysis = 
     open FSharp.Collections.ParallelSeq
     
     let calculateComplexity lines =

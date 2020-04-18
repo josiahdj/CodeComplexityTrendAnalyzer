@@ -42,15 +42,15 @@ module MemberAnalysis =
 
         let distinctMemberInfos (ms : MemberInfo list) = ms |> List.distinctBy (fun m -> m.Name,m.Type)
 
-        let getMemberInfo (astBefore : SyntaxTree) (astAfter : SyntaxTree)  (diff : DiffChange) =
-            let getMemberName' (ast : SyntaxTree) lineNumber =
+        let getMemberInfos (astBefore : SyntaxTree) (astAfter : SyntaxTree)  (diff : DiffChange) =
+            let tryGetMemberInfo (ast : SyntaxTree) lineNumber =
                 let lines = ast.GetText().Lines
                 if lines.Count > lineNumber then
                     let span = lines.[lineNumber].Span;
                     let members = ast.GetRoot().DescendantNodes().OfType<MemberDeclarationSyntax>().Where(fun x -> x.Span.IntersectsWith(span))
 
                     let spanText = span.ToString() |> Strings.splitLines
-                    let printMember (n : MemberDeclarationSyntax) =
+                    let toMemberInfo (n : MemberDeclarationSyntax) =
                         match n with 
                         | :? PropertyDeclarationSyntax as p -> 
                             logger.Debug (sprintf "Property: %O" p.Identifier)
@@ -65,7 +65,7 @@ module MemberAnalysis =
 
                     if members.Any() then
                         members 
-                        |> Seq.map printMember 
+                        |> Seq.map toMemberInfo 
                         |> Seq.choose id
                         |> Seq.tryHead
                     else None
@@ -77,23 +77,23 @@ module MemberAnalysis =
                 | RemoveLine -> astBefore
                 | LeaveLine -> astAfter
 
-            let rec getMem ms lcs =
+            let rec getMemberInfos' ms lcs =
                 match lcs with
                     | [] -> ms
                     | [lineChange] -> 
                             let lineNumber = LineChange.toAbsolutePosition diff.DiffHunk lineChange
                             let ast = getSource lineChange.Operation
-                            getMemberName' ast lineNumber :: ms
+                            tryGetMemberInfo ast lineNumber :: ms
                     | lineChange::rest -> 
                             let lineNumber = LineChange.toAbsolutePosition diff.DiffHunk lineChange
                             let ast = getSource lineChange.Operation
-                            getMemberName' ast lineNumber :: getMem ms rest
+                            tryGetMemberInfo ast lineNumber :: getMemberInfos' ms rest
             
-            let ms = diff.DiffHunk.LineChanges |> getMem [] |> List.choose id |> distinctMemberInfos
+            let ms = diff.DiffHunk.LineChanges |> getMemberInfos' [] |> List.choose id |> distinctMemberInfos
             diff, ms
 
 
-        let getMembers ((rev, diffs, codeBefore, codeAfter) : RevisionInfo * DiffChange list * string * string) =
+        let getMemberRevisions ((rev, diffs, codeBefore, codeAfter) : RevisionInfo * DiffChange list * string * string) =
             let parseCode (code : string) =
                 let st = SourceText.From(code);
                 SyntaxFactory.ParseSyntaxTree(st);
@@ -102,7 +102,7 @@ module MemberAnalysis =
             let astAfter = parseCode codeAfter
 
             diffs 
-            |> List.map (getMemberInfo astBefore astAfter)
+            |> List.map (getMemberInfos astBefore astAfter)
             |> List.map (fun (d, ms) -> d, ms |> distinctMemberInfos)
             |> List.map (fun (d, ms) -> ms |> List.map (fun m -> { Revision = rev; Member = m; LinesAdded = d.DiffHunk.LinesAdded; LinesRemoved = d.DiffHunk.LinesRemoved }))
             |> List.collect id
@@ -125,8 +125,8 @@ module MemberAnalysis =
         seq {
             yield sprintf "hash,date,author,member,lines,complexity,added,removed"
             yield! Git.revs git file
-                    |> List.pairwise // TODO: pulling each diff and file twice this way? Cache them (limit size to 1?), pull from cache second time.
-                    |> List.map (parseRevPair >> getFileChangesAtRev' >> getFileAtRev' >> getMembers)
+                    |> List.pairwise // NOTE, unless there is some caching, this will do double the work unnecessarily
+                    |> List.map (parseRevPair >> getFileChangesAtRev' >> getFileAtRev' >> getMemberRevisions)
                     |> List.collect id
                     |> List.map asCsv
         }

@@ -66,7 +66,7 @@ let main argv =
             printDone "MethodAnalysis"
         
         if cmd = All || cmd = File then
-            FileComplexity.analyze git file |> writer (nameof FileComplexity)
+            FileAnalysis.analyze git file |> writer (nameof FileAnalysis)
             printDone "FileComplexity"
 
 

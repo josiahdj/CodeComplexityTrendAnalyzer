@@ -10,7 +10,7 @@
     <Compile Include="Logging.fs" />
     <Compile Include="Strings.fs" />
     <Compile Include="Git.fs" />
-    <Compile Include="FileComplexity.fs" />
+    <Compile Include="FileAnalysis.fs" />
     <Compile Include="MethodAnalysis.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
