@@ -1,6 +1,6 @@
 ﻿namespace CodeComplexityTrendAnalyzer
 
-type RevisionInfo = { Hash: string; Date: string; Author: string }
+type CommitInfo = { Hash: string; Date: string; Author: string }
 type LineChangeOperation = | LeaveLine | AddLine | RemoveLine
 type LineChange = { Operation: LineChangeOperation; LineNumber: int; Text: string }
 type DiffHunk = { 
@@ -12,7 +12,7 @@ type DiffHunk = {
     LineChanges: LineChange list
     LinesAdded: int
     LinesRemoved: int }
-type DiffChange = { File: string; Revision: string; DiffHunk: DiffHunk }
+type FileRevision = { File: string; Hash: string; DiffHunk: DiffHunk }
 
 [<RequireQualifiedAccess>]
 module LineChange =
@@ -159,7 +159,7 @@ module Git =
 
         let toFileChanges l =
             { File = file; 
-              Revision = revBefore; 
+              Hash = revBefore; 
               DiffHunk = l }
 
         let theFile = String.replace "\\" "/" file
