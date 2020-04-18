@@ -1,7 +1,7 @@
 namespace CodeComplexityTrendAnalyzer
 
 type MemberType = | Constructor | Method | Property
-type MemberInfo = { MemberType : MemberType; LineCount : int; Complexity : int }
+type MemberInfo = { Name : string; Type : MemberType; LineCount : int; Complexity : int }
 type MemberRevision = { Revision: RevisionInfo; Member: MemberInfo; LinesAdded: int; LinesRemoved: int }
 
 module MemberAnalysis = 
@@ -40,6 +40,8 @@ module MemberAnalysis =
             //dumpToFile (sprintf "%s-After-%s.cs" file revAfter.Hash) (Strings.splitLines codeAfter)
             revBefore, diffs, codeBefore, codeAfter
 
+        let distinctMemberInfos (ms : MemberInfo list) = ms |> List.distinctBy (fun m -> m.Name,m.Type)
+
         let getMemberInfo (astBefore : SyntaxTree) (astAfter : SyntaxTree)  (diff : DiffChange) =
             let getMemberName' (ast : SyntaxTree) lineNumber =
                 let lines = ast.GetText().Lines
@@ -47,20 +49,24 @@ module MemberAnalysis =
                     let span = lines.[lineNumber].Span;
                     let members = ast.GetRoot().DescendantNodes().OfType<MemberDeclarationSyntax>().Where(fun x -> x.Span.IntersectsWith(span))
 
+                    let spanText = span.ToString() |> Strings.splitLines
                     let printMember (n : MemberDeclarationSyntax) =
                         match n with 
-                        | :? PropertyDeclarationSyntax as p -> tee logger.Debug (sprintf "Property: %O" p.Identifier)
-                        | :? MethodDeclarationSyntax as m -> tee logger.Debug (sprintf "Method: %O" m.Identifier)
-                        | :? ConstructorDeclarationSyntax as c -> tee logger.Debug (sprintf "Constructor: %O" c.Identifier)
-                        | _ -> String.Empty
-        
-                    let notEmpty s =
-                        s <> String.Empty
+                        | :? PropertyDeclarationSyntax as p -> 
+                            logger.Debug (sprintf "Property: %O" p.Identifier)
+                            Some { Name = p.Identifier.ToString(); Type = Property; LineCount = lines.Count; Complexity = 0 }
+                        | :? MethodDeclarationSyntax as m -> 
+                            logger.Debug (sprintf "Method: %O" m.Identifier)
+                            Some { Name = m.Identifier.ToString(); Type = Method; LineCount = lines.Count; Complexity = 0 }
+                        | :? ConstructorDeclarationSyntax as c -> 
+                            logger.Debug (sprintf "Constructor: %O" c.Identifier)
+                            Some { Name = c.Identifier.ToString(); Type = Constructor; LineCount = lines.Count; Complexity = 0 }
+                        | _ -> None
 
                     if members.Any() then
                         members 
                         |> Seq.map printMember 
-                        |> Seq.filter notEmpty
+                        |> Seq.choose id
                         |> Seq.tryHead
                     else None
                 else None
@@ -71,16 +77,21 @@ module MemberAnalysis =
                 | RemoveLine -> astBefore
                 | LeaveLine -> astAfter
 
-            match diff.DiffHunk.LineChanges with
-                | [] -> diff, None
-                | [lineChange] -> 
-                        let lineNumber = LineChange.toAbsolutePosition diff.DiffHunk lineChange
-                        let ast = getSource lineChange.Operation
-                        diff, getMemberName' ast lineNumber
-                | lineChange::rest -> 
-                        let lineNumber = LineChange.toAbsolutePosition diff.DiffHunk lineChange
-                        let ast = getSource lineChange.Operation
-                        diff, getMemberName' ast lineNumber
+            let rec getMem ms lcs =
+                match lcs with
+                    | [] -> ms
+                    | [lineChange] -> 
+                            let lineNumber = LineChange.toAbsolutePosition diff.DiffHunk lineChange
+                            let ast = getSource lineChange.Operation
+                            getMemberName' ast lineNumber :: ms
+                    | lineChange::rest -> 
+                            let lineNumber = LineChange.toAbsolutePosition diff.DiffHunk lineChange
+                            let ast = getSource lineChange.Operation
+                            getMemberName' ast lineNumber :: getMem ms rest
+            
+            let ms = diff.DiffHunk.LineChanges |> getMem [] |> List.choose id |> distinctMemberInfos
+            diff, ms
+
 
         let getMembers ((rev, diffs, codeBefore, codeAfter) : RevisionInfo * DiffChange list * string * string) =
             let parseCode (code : string) =
@@ -92,17 +103,27 @@ module MemberAnalysis =
 
             diffs 
             |> List.map (getMemberInfo astBefore astAfter)
-            |> List.choose (fun (d,s) -> match s with | Some st -> Some(d,st) | None -> None)
-            |> List.distinctBy (fun (d,s) -> s)
-            |> List.map (fun (d,m) -> { Revision = rev; Member = m; LinesAdded = d.DiffHunk.LinesAdded; LinesRemoved = d.DiffHunk.LinesRemoved })
+            |> List.map (fun (d, ms) -> d, ms |> distinctMemberInfos)
+            |> List.map (fun (d, ms) -> ms |> List.map (fun m -> { Revision = rev; Member = m; LinesAdded = d.DiffHunk.LinesAdded; LinesRemoved = d.DiffHunk.LinesRemoved }))
+            |> List.collect id
             |> tee (fun ms -> logger.Information("Found {MemberCount} members in Revision {Revision} by {Author} on {Date}", ms.Length, rev.Hash, rev.Author, rev.Date))
  
         let asCsv (methodRev : MemberRevision) =
             let revision = methodRev.Revision
-            sprintf "%s,%s,%s,%s,%i,%i" revision.Hash revision.Date revision.Author methodRev.Member methodRev.LinesAdded methodRev.LinesRemoved
+            let methodInfo = methodRev.Member
+
+            sprintf "%s,%s,%s,%s,%i,%i,%i,%i" 
+                revision.Hash 
+                revision.Date 
+                revision.Author 
+                methodInfo.Name 
+                methodInfo.LineCount
+                methodInfo.Complexity
+                methodRev.LinesAdded 
+                methodRev.LinesRemoved
              
         seq {
-            yield sprintf "hash,date,author,member,added,removed"
+            yield sprintf "hash,date,author,member,lines,complexity,added,removed"
             yield! Git.revs git file
                     |> List.pairwise // TODO: pulling each diff and file twice this way? Cache them (limit size to 1?), pull from cache second time.
                     |> List.map (parseRevPair >> getFileChangesAtRev' >> getFileAtRev' >> getMembers)
