@@ -36,7 +36,7 @@ module FileComplexity =
 
         lineComplexities
 
-    let getStats git file =
+    let analyze git file =
         let calculateComplexity' revLines =
             let rev, date, author, lines = revLines
             rev, date, author, calculateComplexity lines

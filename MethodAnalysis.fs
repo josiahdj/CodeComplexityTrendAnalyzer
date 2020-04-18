@@ -1,8 +1,10 @@
 namespace CodeComplexityTrendAnalyzer
 
-type MethodRevision = { Revision: RevisionInfo; Member: string; LinesAdded: int; LinesRemoved: int }
+type MemberType = | Constructor | Method | Property
+type MemberInfo = { MemberType : MemberType; LineCount : int; Complexity : int }
+type MemberRevision = { Revision: RevisionInfo; Member: MemberInfo; LinesAdded: int; LinesRemoved: int }
 
-module MethodAnalysis = 
+module MemberAnalysis = 
     open System
     open Microsoft.CodeAnalysis.Text
     open Microsoft.CodeAnalysis.CSharp
@@ -11,7 +13,7 @@ module MethodAnalysis =
     open Microsoft.CodeAnalysis
     open Fake.Core
     
-    let getMethodInfo git file =
+    let analyze git file =
         let parseRevPair (prev, curr) =
             Git.parseRev prev, Git.parseRev curr
 
@@ -38,8 +40,9 @@ module MethodAnalysis =
             //dumpToFile (sprintf "%s-After-%s.cs" file revAfter.Hash) (Strings.splitLines codeAfter)
             revBefore, diffs, codeBefore, codeAfter
 
-        let getMemberName (astBefore : SyntaxTree) (astAfter : SyntaxTree)  (diff : DiffChange) =
-            let getMemberName' (lines : TextLineCollection) (ast : SyntaxTree) lineNumber =
+        let getMemberInfo (astBefore : SyntaxTree) (astAfter : SyntaxTree)  (diff : DiffChange) =
+            let getMemberName' (ast : SyntaxTree) lineNumber =
+                let lines = ast.GetText().Lines
                 if lines.Count > lineNumber then
                     let span = lines.[lineNumber].Span;
                     let members = ast.GetRoot().DescendantNodes().OfType<MemberDeclarationSyntax>().Where(fun x -> x.Span.IntersectsWith(span))
@@ -62,24 +65,22 @@ module MethodAnalysis =
                     else None
                 else None
 
-            let beforeLines = astBefore.GetText().Lines
-            let afterLines = astAfter.GetText().Lines
             let getSource op = 
                 match op with 
-                | AddLine -> afterLines, astAfter
-                | RemoveLine -> beforeLines, astBefore
-                | LeaveLine -> afterLines, astAfter
+                | AddLine -> astAfter
+                | RemoveLine -> astBefore
+                | LeaveLine -> astAfter
 
             match diff.DiffHunk.LineChanges with
                 | [] -> diff, None
                 | [lineChange] -> 
                         let lineNumber = LineChange.toAbsolutePosition diff.DiffHunk lineChange
-                        let (lines, ast) = getSource lineChange.Operation
-                        diff, getMemberName' lines ast lineNumber
+                        let ast = getSource lineChange.Operation
+                        diff, getMemberName' ast lineNumber
                 | lineChange::rest -> 
                         let lineNumber = LineChange.toAbsolutePosition diff.DiffHunk lineChange
-                        let (lines, ast) = getSource lineChange.Operation
-                        diff, getMemberName' lines ast lineNumber
+                        let ast = getSource lineChange.Operation
+                        diff, getMemberName' ast lineNumber
 
         let getMembers ((rev, diffs, codeBefore, codeAfter) : RevisionInfo * DiffChange list * string * string) =
             let parseCode (code : string) =
@@ -90,13 +91,13 @@ module MethodAnalysis =
             let astAfter = parseCode codeAfter
 
             diffs 
-            |> List.map (getMemberName astBefore astAfter)
+            |> List.map (getMemberInfo astBefore astAfter)
             |> List.choose (fun (d,s) -> match s with | Some st -> Some(d,st) | None -> None)
             |> List.distinctBy (fun (d,s) -> s)
             |> List.map (fun (d,m) -> { Revision = rev; Member = m; LinesAdded = d.DiffHunk.LinesAdded; LinesRemoved = d.DiffHunk.LinesRemoved })
             |> tee (fun ms -> logger.Information("Found {MemberCount} members in Revision {Revision} by {Author} on {Date}", ms.Length, rev.Hash, rev.Author, rev.Date))
  
-        let asCsv (methodRev : MethodRevision) =
+        let asCsv (methodRev : MemberRevision) =
             let revision = methodRev.Revision
             sprintf "%s,%s,%s,%s,%i,%i" revision.Hash revision.Date revision.Author methodRev.Member methodRev.LinesAdded methodRev.LinesRemoved
              
