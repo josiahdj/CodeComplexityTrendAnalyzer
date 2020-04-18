@@ -1,6 +1,18 @@
 ﻿namespace CodeComplexityTrendAnalyzer
 
-type Stats(hash : string, date: string, author: string, values : int list) as this =
+type ComplexityStats(lines : string list) as this =
+    let values =
+        let lineComplexity (line : string) =
+            // count indentations as a proxy for complexity; see: http://softwareprocess.es/static/WhiteSpace.html
+            (Strings.countLeadingSpaces line)/4 + (Strings.countLeadingTabs line)
+        
+        let lineComplexities = 
+            lines
+            |> List.filter Strings.containsCode 
+            |> List.map lineComplexity
+
+        lineComplexities
+
     let count = List.length values
     member _.Count with get () = count
     member _.Total with get () = List.sum values
@@ -15,44 +27,25 @@ type Stats(hash : string, date: string, author: string, values : int list) as th
         values |> List.sumBy variance |> avgVariance |> sqrt
     
     member _.Mean with get () = float this.Total / float this._SafeDenomenator
-    member _.Hash with get () = hash
-    member _.Author with get () = author
-    member _.Date with get () = date
     member private _._SafeDenomenator with get () = if count = 0 then 1 else count
 
 
 module FileAnalysis = 
     open FSharp.Collections.ParallelSeq
     
-    let calculateComplexity lines =
-        let lineComplexity (line : string) =
-            // count indentations as a proxy for complexity; see: http://softwareprocess.es/static/WhiteSpace.html
-            (Strings.countLeadingSpaces line)/4 + (Strings.countLeadingTabs line)
-        
-        let lineComplexities = 
-            lines
-            |> List.filter Strings.containsCode 
-            |> List.map lineComplexity
-
-        lineComplexities
 
     let analyze git file =
-        let calculateComplexity' revLines =
-            let rev, date, author, lines = revLines
-            rev, date, author, calculateComplexity lines
-
         let getFileAtRev' revInfo =
             let { Hash = rev; Date = date; Author = author } = revInfo
             rev, date, author, Git.getFileAtRev git file rev
 
-        let asCsv (stat : Stats) =
-            sprintf "%s,%s,%s,%i,%i,%.2f,%.2f" stat.Hash stat.Date stat.Author stat.Count stat.Total stat.Mean stat.StdDev
+        let asCsv (rev, date, author, stat : ComplexityStats) =
+            sprintf "%s,%s,%s,%i,%i,%.2f,%.2f" rev date author stat.Count stat.Total stat.Mean stat.StdDev
 
         let fileComplexityTrendAsCsv = 
             Git.parseRev 
             >> getFileAtRev'
-            >> calculateComplexity'
-            >> Stats 
+            >> (fun (rev, date, author, cs) -> rev, date, author, ComplexityStats(cs)) 
             >> asCsv 
 
         seq { 

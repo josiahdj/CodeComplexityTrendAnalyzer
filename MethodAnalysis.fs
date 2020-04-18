@@ -1,7 +1,7 @@
 namespace CodeComplexityTrendAnalyzer
 
 type MemberType = | Constructor | Method | Property
-type MemberInfo = { Name : string; Type : MemberType; LineCount : int; Complexity : int }
+type MemberInfo = { Name : string; Type : MemberType; LineCount : int; Complexity : ComplexityStats }
 type MemberRevision = { Revision: RevisionInfo; Member: MemberInfo; LinesAdded: int; LinesRemoved: int }
 
 module MemberAnalysis = 
@@ -54,13 +54,13 @@ module MemberAnalysis =
                         match n with 
                         | :? PropertyDeclarationSyntax as p -> 
                             logger.Debug (sprintf "Property: %O" p.Identifier)
-                            Some { Name = p.Identifier.ToString(); Type = Property; LineCount = lines.Count; Complexity = 0 }
+                            Some { Name = p.Identifier.ToString(); Type = Property; LineCount = lines.Count; Complexity = ComplexityStats(spanText) }
                         | :? MethodDeclarationSyntax as m -> 
                             logger.Debug (sprintf "Method: %O" m.Identifier)
-                            Some { Name = m.Identifier.ToString(); Type = Method; LineCount = lines.Count; Complexity = 0 }
+                            Some { Name = m.Identifier.ToString(); Type = Method; LineCount = lines.Count; Complexity = ComplexityStats(spanText) }
                         | :? ConstructorDeclarationSyntax as c -> 
                             logger.Debug (sprintf "Constructor: %O" c.Identifier)
-                            Some { Name = c.Identifier.ToString(); Type = Constructor; LineCount = lines.Count; Complexity = 0 }
+                            Some { Name = c.Identifier.ToString(); Type = Constructor; LineCount = lines.Count; Complexity = ComplexityStats(spanText) }
                         | _ -> None
 
                     if members.Any() then
@@ -112,18 +112,19 @@ module MemberAnalysis =
             let revision = methodRev.Revision
             let methodInfo = methodRev.Member
 
-            sprintf "%s,%s,%s,%s,%i,%i,%i,%i" 
+            sprintf "%s,%s,%s,%s,%i,%i,%.2f,%i,%i"
                 revision.Hash 
                 revision.Date 
                 revision.Author 
                 methodInfo.Name 
                 methodInfo.LineCount
-                methodInfo.Complexity
+                methodInfo.Complexity.Total
+                methodInfo.Complexity.Mean
                 methodRev.LinesAdded 
                 methodRev.LinesRemoved
              
         seq {
-            yield sprintf "hash,date,author,member,lines,complexity,added,removed"
+            yield sprintf "hash,date,author,member,lines,tot_complex,avg_complex,added,removed"
             yield! Git.revs git file
                     |> List.pairwise // NOTE, unless there is some caching, this will do double the work unnecessarily
                     |> List.map (parseRevPair >> getFileChangesAtRev' >> getFileAtRev' >> getMemberRevisions)
