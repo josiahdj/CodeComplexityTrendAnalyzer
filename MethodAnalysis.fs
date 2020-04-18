@@ -49,18 +49,20 @@ module MemberAnalysis =
                     let span = lines.[lineNumber].Span;
                     let members = ast.GetRoot().DescendantNodes().OfType<MemberDeclarationSyntax>().Where(fun x -> x.Span.IntersectsWith(span))
 
-                    let spanText = span.ToString() |> Strings.splitLines
                     let toMemberInfo (n : MemberDeclarationSyntax) =
                         match n with 
                         | :? PropertyDeclarationSyntax as p -> 
                             logger.Debug (sprintf "Property: %O" p.Identifier)
-                            Some { Name = p.Identifier.ToString(); Type = Property; LineCount = lines.Count; Complexity = ComplexityStats(spanText) }
+                            let spanText = p.ToString() |> Strings.splitLines
+                            Some { Name = p.Identifier.ToString(); Type = Property; LineCount = spanText.Length; Complexity = ComplexityStats(spanText) }
                         | :? MethodDeclarationSyntax as m -> 
                             logger.Debug (sprintf "Method: %O" m.Identifier)
-                            Some { Name = m.Identifier.ToString(); Type = Method; LineCount = lines.Count; Complexity = ComplexityStats(spanText) }
+                            let spanText = m.ToString() |> Strings.splitLines
+                            Some { Name = m.Identifier.ToString(); Type = Method; LineCount = spanText.Length; Complexity = ComplexityStats(spanText) }
                         | :? ConstructorDeclarationSyntax as c -> 
                             logger.Debug (sprintf "Constructor: %O" c.Identifier)
-                            Some { Name = c.Identifier.ToString(); Type = Constructor; LineCount = lines.Count; Complexity = ComplexityStats(spanText) }
+                            let spanText = c.ToString() |> Strings.splitLines
+                            Some { Name = c.Identifier.ToString(); Type = Constructor; LineCount = spanText.Length; Complexity = ComplexityStats(spanText) }
                         | _ -> None
 
                     if members.Any() then
@@ -112,11 +114,12 @@ module MemberAnalysis =
             let revision = methodRev.Revision
             let methodInfo = methodRev.Member
 
-            sprintf "%s,%s,%s,%s,%i,%i,%.2f,%i,%i"
+            sprintf "%s,%s,%s,%s,%A,%i,%i,%.2f,%i,%i"
                 revision.Hash 
                 revision.Date 
                 revision.Author 
                 methodInfo.Name 
+                methodInfo.Type
                 methodInfo.LineCount
                 methodInfo.Complexity.Total
                 methodInfo.Complexity.Mean
@@ -124,7 +127,7 @@ module MemberAnalysis =
                 methodRev.LinesRemoved
              
         seq {
-            yield sprintf "hash,date,author,member,lines,tot_complex,avg_complex,added,removed"
+            yield sprintf "hash,date,author,member,type,lines,tot_complex,avg_complex,added,removed"
             yield! Git.revs git file
                     |> List.pairwise // NOTE, unless there is some caching, this will do double the work unnecessarily
                     |> List.map (parseRevPair >> getFileChangesAtRev' >> getFileAtRev' >> getMemberRevisions)
