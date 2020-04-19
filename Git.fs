@@ -134,12 +134,12 @@ module Git =
                             failwith "this shouldn't really happen!"
                         | [curr] ->
                             let l = lineNum + 1
-                            logger.Debug("Hunk #{HunkNumber}, LineChange {LineNumber}: {Line}", hunks.Length, l, lc.Text)
+                            logger.Debug("Hunk #{HunkNumber}, LineChange {LineNumber} ({Operation}): {Line}", hunks.Length, lc.Operation, l, lc.Text)
                             let newCurr = updateDiffHunk curr lc [] l
                             toHunks' newCurr l
                         | curr::tail ->
                             let l = lineNum + 1
-                            logger.Debug("Hunk #{HunkNumber}, LineChange {LineNumber}: {Line}", hunks.Length, l, lc.Text)
+                            logger.Debug("Hunk #{HunkNumber}, LineChange {LineNumber} ({Operation}): {Line}", hunks.Length, lc.Operation, l, lc.Text)
                             let newCurr = updateDiffHunk curr lc tail l
                             toHunks' newCurr l
                     | DiffHeader dh -> 

@@ -89,46 +89,68 @@ module MemberAnalysis =
                     | [lineChange] -> 
                             let lineNumber = LineChange.toAbsolutePosition diff.DiffHunk lineChange
                             let ast = getSource lineChange.Operation
-                            tryGetMemberInfo ast lineNumber :: ms
+                            match tryGetMemberInfo ast lineNumber with
+                            | Some mi -> ms |> Set.add mi
+                            | _ -> ms
                     | lineChange::rest -> 
                             let lineNumber = LineChange.toAbsolutePosition diff.DiffHunk lineChange
                             let ast = getSource lineChange.Operation
-                            tryGetMemberInfo ast lineNumber :: getMemberInfos' ms rest
+                            match tryGetMemberInfo ast lineNumber with
+                            | Some mi -> Set.add mi (getMemberInfos' ms rest)
+                            | _ -> getMemberInfos' ms rest
             
             let getMemberStats (ast : SyntaxTree) (mem : MemberInfo) =
                 let lines = 
-                    let ps =  mem.Parameters |> Option.defaultValue String.Empty
+                    let params' =  mem.Parameters |> Option.defaultValue String.Empty
                     try
                         match mem.Type with 
                         | SyntaxKind.PropertyDeclaration -> 
-                            let p = ast.GetRoot().DescendantNodes().OfType<PropertyDeclarationSyntax>().Single(fun x -> x.Identifier.Text = mem.Name)
-                            p.ToString() |> Strings.splitLines
+                            let p = ast.GetRoot().DescendantNodes().OfType<PropertyDeclarationSyntax>().First(fun x -> x.Identifier.Text = mem.Name)
+                            p.ToString() |> Strings.splitLines |> Some
                         | SyntaxKind.MethodDeclaration ->
-                            let m = ast.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(fun x -> x.Identifier.Text = mem.Name && (parameters x.ParameterList) = ps)
-                            m.ToString() |> Strings.splitLines
+                            let ms = ast.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Where(fun x -> x.Identifier.Text = mem.Name)
+                            if ms.Any() then
+                                let m = ms |> Seq.tryFind (fun x -> (parameters x.ParameterList) = params')
+                                match m with
+                                | Some m' -> m'.ToString() |> Strings.splitLines |> Some
+                                | None -> 
+                                    let meths = ms |> Seq.map (fun m -> m.ParameterList.Parameters.ToString()) |> String.concat "\r\n" 
+                                    logger.Debug("Couldn't find Method {Identifier}{Parameters}. Trying for single member. Options:\r\n{Constructors}", mem.Name, params', meths)
+                                    ms.Single().ToString() |> Strings.splitLines |> Some // bet that the signature was changed and that there's only one instance (if there are overrides, all bets are off)
+                            else None
                         | SyntaxKind.ConstructorDeclaration ->
-                            let c = ast.GetRoot().DescendantNodes().OfType<ConstructorDeclarationSyntax>().Single(fun x -> x.Identifier.Text = mem.Name && (parameters x.ParameterList) = ps)
-                            c.ToString() |> Strings.splitLines
+                            let cs = ast.GetRoot().DescendantNodes().OfType<ConstructorDeclarationSyntax>().Where(fun x -> x.Identifier.Text = mem.Name)
+                            if cs.Any() then
+                                let c = cs |> Seq.tryFind (fun x -> (parameters x.ParameterList) = params')
+                                match c with
+                                | Some c' -> c'.ToString() |> Strings.splitLines |> Some
+                                | None -> 
+                                    let ctors = cs |> Seq.map (fun c -> c.ParameterList.Parameters.ToString()) |> String.concat "\r\n" 
+                                    logger.Debug("Couldn't find Constructor {Identifier}{Parameters}. Trying for single member. Options:\r\n{Constructors}", mem.Name, params', ctors)
+                                    cs.Single().ToString() |> Strings.splitLines |> Some // bet that the signature was changed and that there's only one instance (if there are overrides, all bets are off)
+                            else None
                         | _ -> 
                             logger.Error("Was given a member info {Identifier} with an unrecognized MemberKind {MemberKind}", mem.Name, mem.Type)
-                            []
+                            None
                     with 
-                    | :? InvalidOperationException as ex -> 
-                        logger.Error(ex, "Couldn't find the {MemberKind} {Identifier}{Parameters} in the AST", mem.Type, mem.Name, ps)
-                        []
-                let stats = lines |> ComplexityStats |> Some
-                { mem with Complexity = stats; LineCount = lines.Length }
+                    | ex -> 
+                        logger.Error(ex, "Couldn't find the {MemberKind} {Identifier}{Parameters} in the AST", mem.Type, mem.Name, params')
+                        None
+
+                match lines with
+                | Some ls ->
+                    let stats = ls |> ComplexityStats.create |> Some
+                    { mem with Complexity = stats; LineCount = ls.Length }
+                | _ -> mem
 
             let ms = 
                 //diff.DiffHunk.LineChanges 
-                //|> getMemberInfos' [] 
-                //|> List.choose id 
-                //|> distinctMemberInfos 
+                //|> getMemberInfos' Set.empty
+                //|> Set.toList
                 //|> List.map (getMemberStats astAfter)
-                let mis = getMemberInfos' [] diff.DiffHunk.LineChanges 
-                let misNoOptions = List.choose id mis
-                let misDisctinct = distinctMemberInfos misNoOptions
-                let misWithStats = List.map (getMemberStats astAfter) misDisctinct
+                //|> List.filter (fun m -> m.Complexity.IsSome)
+                let mis = getMemberInfos' Set.empty diff.DiffHunk.LineChanges |> Set.toList
+                let misWithStats = List.map (getMemberStats astAfter) mis |> List.filter (fun m -> m.Complexity.IsSome)
                 misWithStats
 
             diff, ms
@@ -156,7 +178,7 @@ module MemberAnalysis =
         let asCsv (methodRev : MemberRevision) =
             let revision = methodRev.Commit
             let methodInfo = methodRev.Member
-            let complexity = methodRev.Member.Complexity |> Option.defaultWith (fun () -> ComplexityStats([]))
+            let complexity = methodRev.Member.Complexity |> Option.defaultWith (fun () -> ComplexityStats.create [])
 
             sprintf "%s,%s,%s,%A,%s,%i,%i,%.2f,%i,%i"
                 revision.Hash 
