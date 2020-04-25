@@ -1,13 +1,12 @@
 namespace CodeComplexityTrendAnalyzer
 
-open Microsoft.CodeAnalysis.CSharp
-
 type MemberType = | Constructor | Method | Property
-type MemberInfo = { Name: string; Type: SyntaxKind; Parameters: string option; LineCount: int; Complexity: ComplexityStats option }
+type MemberInfo = { Name: string; Type: MemberType; Parameters: string option; LineCount: int; Complexity: ComplexityStats option }
 type MemberRevision = { Commit: CommitInfo; Member: MemberInfo; LinesAdded: int; LinesRemoved: int }
 
 module MemberAnalysis = 
     open System
+    open Microsoft.CodeAnalysis.CSharp
     open Microsoft.CodeAnalysis.Text
     open System.Linq
     open Microsoft.CodeAnalysis.CSharp.Syntax
@@ -52,15 +51,15 @@ module MemberAnalysis =
                         match n with 
                         | :? PropertyDeclarationSyntax as p -> 
                             logger.Debug("Property: @{Identifier}", p.Identifier)
-                            Some { Name = p.Identifier.ToString(); Type = p.Kind(); Parameters = None; LineCount = 0; Complexity = None; }
+                            Some { Name = p.Identifier.ToString(); Type = Property; Parameters = None; LineCount = 0; Complexity = None; }
                         | :? MethodDeclarationSyntax as m -> 
                             let ps = parameters m.ParameterList
                             logger.Debug("Method: @{Identifier}, Parameters: {Parameters}", m.Identifier, ps)
-                            Some { Name = m.Identifier.ToString(); Type = m.Kind(); Parameters = Some ps; LineCount = 0; Complexity = None; }
+                            Some { Name = m.Identifier.ToString(); Type = Method; Parameters = Some ps; LineCount = 0; Complexity = None; }
                         | :? ConstructorDeclarationSyntax as c -> 
                             let ps = parameters c.ParameterList
                             logger.Debug("Constructor: @{Identifier}, Parameters: {Parameters}", c.Identifier, ps)
-                            Some { Name = c.Identifier.ToString(); Type = c.Kind(); Parameters = Some ps; LineCount = 0; Complexity = None; }
+                            Some { Name = c.Identifier.ToString(); Type = Constructor; Parameters = Some ps; LineCount = 0; Complexity = None; }
                         | _ -> 
                             logger.Warning("This member declaration syntax should have been prevented: {MemberKind}", n.Kind())
                             None // should (can) be prevented by the Where predicate
@@ -104,10 +103,10 @@ module MemberAnalysis =
                     let params' =  mem.Parameters |> Option.defaultValue String.Empty
                     try
                         match mem.Type with 
-                        | SyntaxKind.PropertyDeclaration -> 
+                        | Property -> 
                             let p = ast.GetRoot().DescendantNodes().OfType<PropertyDeclarationSyntax>().First(fun x -> x.Identifier.Text = mem.Name)
                             p.ToString() |> Strings.splitLines |> Some
-                        | SyntaxKind.MethodDeclaration ->
+                        | Method ->
                             let ms = ast.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Where(fun x -> x.Identifier.Text = mem.Name)
                             if ms.Any() then
                                 let m = ms |> Seq.tryFind (fun x -> (parameters x.ParameterList) = params')
@@ -118,7 +117,7 @@ module MemberAnalysis =
                                     logger.Debug("Couldn't find Method {Identifier}{Parameters}. Trying for single member. Options:\r\n{Constructors}", mem.Name, params', meths)
                                     ms.Single().ToString() |> Strings.splitLines |> Some // bet that the signature was changed and that there's only one instance (if there are overrides, all bets are off)
                             else None
-                        | SyntaxKind.ConstructorDeclaration ->
+                        | Constructor ->
                             let cs = ast.GetRoot().DescendantNodes().OfType<ConstructorDeclarationSyntax>().Where(fun x -> x.Identifier.Text = mem.Name)
                             if cs.Any() then
                                 let c = cs |> Seq.tryFind (fun x -> (parameters x.ParameterList) = params')
@@ -129,9 +128,6 @@ module MemberAnalysis =
                                     logger.Debug("Couldn't find Constructor {Identifier}{Parameters}. Trying for single member. Options:\r\n{Constructors}", mem.Name, params', ctors)
                                     cs.Single().ToString() |> Strings.splitLines |> Some // bet that the signature was changed and that there's only one instance (if there are overrides, all bets are off)
                             else None
-                        | _ -> 
-                            logger.Error("Was given a member info {Identifier} with an unrecognized MemberKind {MemberKind}", mem.Name, mem.Type)
-                            None
                     with 
                     | ex -> 
                         logger.Error(ex, "Couldn't find the {MemberKind} {Identifier}{Parameters} in the AST", mem.Type, mem.Name, params')
@@ -154,7 +150,6 @@ module MemberAnalysis =
                 misWithStats
 
             diff, ms
-
 
         let getMemberRevisions ((rev, diffs, prevCode, currCode) : CommitInfo * FileRevision list * string * string) =
             let parseCode (code : string) =
