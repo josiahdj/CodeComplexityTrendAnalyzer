@@ -12,11 +12,8 @@ module MemberAnalysis =
     open Microsoft.CodeAnalysis.CSharp.Syntax
     open Microsoft.CodeAnalysis
     open Fake.Core
-    
-    let getRawData git file =
-        let parseRevPair (prevHash, currHash) =
-            Git.parseRev prevHash, Git.parseRev currHash
 
+    let getRawData git file revs =
         let memoize f =
             let cache = ref Map.empty
             fun x ->
@@ -170,10 +167,10 @@ module MemberAnalysis =
             |> List.collect id
             |> tee (fun ms -> logger.Information("Found {MemberCount} members in Revision {Revision} by {Author} on {Date}", ms.Length, rev.Hash, rev.Author, rev.Date))
  
-        Git.revs git file
-            |> List.pairwise // NOTE, unless there is some caching, this will do double the work unnecessarily
-            |> List.map (parseRevPair >> getFileChangesAtRev' >> getFileAtRev' >> getMemberRevisions)
-            |> List.collect id
+        revs
+        |> List.pairwise // NOTE, unless there is some caching, this will do double the work unnecessarily
+        |> List.map (getFileChangesAtRev' >> getFileAtRev' >> getMemberRevisions)
+        |> List.collect id
             
     let asCsv mrs =
         let asCsv' methodRev =

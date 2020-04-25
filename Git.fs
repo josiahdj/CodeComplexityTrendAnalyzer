@@ -38,14 +38,18 @@ module Git =
     let gitResult repoPath = 
         CommandHelper.getGitResult repoPath
 
-    let revs git filePath : string list = 
-        let gitCmd = sprintf "log --date=short --pretty=format:%%h--%%ad--%%an %s" filePath
-        git gitCmd 
-        |> List.rev
-
     let parseRev commit =
         let parts = String.splitStr "--" commit
         { Hash = parts.[0]; Date = parts.[1]; Author = parts.[2] }
+    
+    let parseRevPair (prevHash, currHash) =
+        parseRev prevHash, parseRev currHash
+
+    let revs git filePath = 
+        let gitCmd = sprintf "log --date=short --pretty=format:%%h--%%ad--%%an %s" filePath
+        git gitCmd 
+        |> List.map parseRev
+        |> List.rev
 
     let getFileAtRev git file rev : string list =
         let theFile = String.replace "\\" "/" file

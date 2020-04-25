@@ -63,19 +63,21 @@ let main argv =
 
         if cmd = All || cmd = Members then
             file 
-            |> MemberAnalysis.getRawData git 
-            |> ROP.tee Database.toTable
-            |> MemberAnalysis.asCsv 
-            |> writer (nameof MemberAnalysis)
+            |> (Git.revs git >> ROP.tee Database.toTable)  // get from DB, if available?
+            |> (MemberAnalysis.getRawData git file
+                >> ROP.tee Database.toTable 
+                >> MemberAnalysis.asCsv 
+                >> writer (nameof MemberAnalysis))
 
             printDone "MethodAnalysis"
         
         if cmd = All || cmd = File then
             file
-            |> FileComplexityAnalysis.getRawData git
-            |> ROP.tee Database.toTable
-            |> FileComplexityAnalysis.asCsv 
-            |> writer (nameof FileComplexityAnalysis)
+            |> (Git.revs git >> ROP.tee Database.toTable)  // get from DB, if available?
+            |> (FileComplexityAnalysis.getRawData git file
+                >> ROP.tee Database.toTable
+                >> FileComplexityAnalysis.asCsv 
+                >> writer (nameof FileComplexityAnalysis))
 
             printDone "FileComplexity"
 

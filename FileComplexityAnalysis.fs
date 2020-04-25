@@ -47,7 +47,7 @@ type FileComplexity = {
         Complexity : ComplexityStats
     }
 module FileComplexityAnalysis = 
-    let getRawData git file =
+    let getRawData git file revs =
         let getFileAtRev' commit =
             let { CommitInfo.Hash = hash; Date = date; Author = author } = commit
             hash, date, author, Git.getFileAtRev git file hash
@@ -59,9 +59,8 @@ module FileComplexityAnalysis =
               Author = author
               Complexity = complexity }
 
-        let fileComplexityTrend = Git.parseRev >> getFileAtRev' >> asComplexityStat
-
-        Git.revs git file |> List.map fileComplexityTrend
+        revs
+        |> List.map (getFileAtRev' >> asComplexityStat)
 
     let asCsv fcs =
         let asCsv' fc =
