@@ -3,6 +3,11 @@ namespace CodeComplexityTrendAnalyzer
 type MemberType = | Constructor | Method | Property
 type MemberInfo = { Name: string; Type: MemberType; Parameters: string option; LineCount: int; Complexity: ComplexityStats option }
 type MemberRevision = { Commit: CommitInfo; Member: MemberInfo; LinesAdded: int; LinesRemoved: int }
+type CommitPair = { Previous: CommitInfo; Current: CommitInfo }
+    with
+        static member ofTuple(prev, curr) = { Previous = prev; Current = curr }
+type CommitDiffs = CommitPair * FileRevision list
+type CodeToDiff = { Commit: CommitInfo; FileRevisions: FileRevision list; PreviousCode: string; CurrentCode: string }
 
 module MemberAnalysis = 
     open System
@@ -13,30 +18,31 @@ module MemberAnalysis =
     open Microsoft.CodeAnalysis
     open Fake.Core
 
-    let getRawData git file revs =
-        let memoize f =
-            let cache = ref Map.empty
-            fun x ->
-                match (!cache).TryFind(x) with
-                | Some res -> res
-                | None ->
-                    let res = f x
-                    cache := (!cache).Add(x,res)
-                    res
+    let private memoize f =
+        let cache = ref Map.empty
+        fun x ->
+            match (!cache).TryFind(x) with
+            | Some res -> res
+            | None ->
+                let res = f x
+                cache := (!cache).Add(x,res)
+                res
 
-        let getFileChangesAtRevMemoized = memoize (Git.getFileChangesAtRev git file)
-        let getFileChangesAtRev' ((prevCommit, currCommit) : CommitInfo * CommitInfo) =
-            let diffs = getFileChangesAtRevMemoized prevCommit.Hash currCommit.Hash
-            prevCommit, currCommit, diffs
+    let private getFileChangesAtRevMemoized git file = memoize (Git.getFileChangesAtRev git file)
+    let getFileChangesAtRev git file (commitPair : CommitPair) : CommitDiffs =
+        let diffs = getFileChangesAtRevMemoized git file commitPair.Previous commitPair.Current
+        commitPair, diffs
 
-        let getFileAtRevMemoized = memoize (Git.getFileAtRev git file)
-        let getFileAtRev' ((prevCommit, currCommit, diffs) : CommitInfo * CommitInfo * FileRevision list) =
-            let prevCode = getFileAtRevMemoized prevCommit.Hash |> String.toLines
-            //dumpToFile (sprintf "%s-Before-%s.cs" file revBefore.Hash) (Strings.splitLines codeBefore)
-            let currCode = getFileAtRevMemoized currCommit.Hash |> String.toLines
-            //dumpToFile (sprintf "%s-After-%s.cs" file revAfter.Hash) (Strings.splitLines codeAfter)
-            currCommit, diffs, prevCode, currCode
+    let private getFileAtRevMemoized git file = memoize (Git.getFileAtRev git file)
+    let getFileAtRev git file (commitDiffs : CommitDiffs) : CodeToDiff =
+        let (commitPair, diffs) = commitDiffs
+        let prevCode = getFileAtRevMemoized git file commitPair.Previous.Hash |> String.toLines
+        //dumpToFile (sprintf "%s-Before-%s.cs" file revBefore.Hash) (Strings.splitLines codeBefore)
+        let currCode = getFileAtRevMemoized git file commitPair.Current.Hash |> String.toLines
+        //dumpToFile (sprintf "%s-After-%s.cs" file revAfter.Hash) (Strings.splitLines codeAfter)
+        { Commit = commitPair.Current; FileRevisions = diffs; PreviousCode = prevCode; CurrentCode = currCode }
 
+    let getRawData (revs : CodeToDiff) =
         let distinctMemberInfos (ms : MemberInfo list) = ms |> List.distinctBy (fun m -> sprintf "%s-%s" (m.Type.ToString()) m.Name)
         let parameters (pl : ParameterListSyntax) = pl.Parameters.ToList() |> Seq.map (fun p -> p.ToString()) |> Seq.sort |> String.concat ","
 
@@ -137,18 +143,14 @@ module MemberAnalysis =
                 | _ -> mem
 
             let ms = 
-                //diff.DiffHunk.LineChanges 
-                //|> getMemberInfos' Set.empty
-                //|> Set.toList
-                //|> List.map (getMemberStats astAfter)
-                //|> List.filter (fun m -> m.Complexity.IsSome)
                 let mis = getMemberInfos' Set.empty diff.DiffHunk.LineChanges |> Set.toList
                 let misWithStats = List.map (getMemberStats currAst) mis |> List.filter (fun m -> m.Complexity.IsSome)
                 misWithStats
 
             diff, ms
 
-        let getMemberRevisions ((rev, diffs, prevCode, currCode) : CommitInfo * FileRevision list * string * string) =
+        let getMemberRevisions (toDiff : CodeToDiff) =
+            let { Commit = rev; FileRevisions = diffs; PreviousCode = prevCode; CurrentCode = currCode } = toDiff
             let parseCode (code : string) =
                 let st = SourceText.From(code);
                 SyntaxFactory.ParseSyntaxTree(st);
@@ -166,17 +168,15 @@ module MemberAnalysis =
             |> List.map (getMemberInfos' >> toRevisionInfos)
             |> List.collect id
             |> tee (fun ms -> logger.Information("Found {MemberCount} members in Revision {Revision} by {Author} on {Date}", ms.Length, rev.Hash, rev.Author, rev.Date))
- 
+        
         revs
-        |> List.pairwise // NOTE, unless there is some caching, this will do double the work unnecessarily
-        |> List.map (getFileChangesAtRev' >> getFileAtRev' >> getMemberRevisions)
-        |> List.collect id
+        |> getMemberRevisions
             
-    let asCsv mrs =
-        let asCsv' methodRev =
-            let revision = methodRev.Commit
-            let methodInfo = methodRev.Member
-            let complexity = methodRev.Member.Complexity |> Option.defaultWith (fun () -> ComplexityStats.create [])
+    let asCsv (mrs : MemberRevision list) =
+        let asCsv' (memberRev : MemberRevision) =
+            let revision = memberRev.Commit
+            let methodInfo = memberRev.Member
+            let complexity = memberRev.Member.Complexity |> Option.defaultWith (fun () -> ComplexityStats.create [])
 
             sprintf "%s,%s,%s,%A,%s,%i,%i,%.2f,%i,%i"
                 revision.Hash 
@@ -187,8 +187,8 @@ module MemberAnalysis =
                 methodInfo.LineCount
                 complexity.Total
                 complexity.Mean
-                methodRev.LinesAdded 
-                methodRev.LinesRemoved
+                memberRev.LinesAdded 
+                memberRev.LinesRemoved
 
         seq {
             yield sprintf "hash,date,author,kind,member,loc,complex_tot,complex_avg,loc_added,loc_removed"

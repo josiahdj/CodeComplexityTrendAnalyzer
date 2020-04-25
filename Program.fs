@@ -62,12 +62,16 @@ let main argv =
             else Console.Out.WriteLine("Done with {0}.", out)
 
         if cmd = All || cmd = Members then
+            let getFileChangesAtRev = MemberAnalysis.getFileChangesAtRev git file
+            let getFileAtRev = MemberAnalysis.getFileAtRev git file 
+            let getMemberRevisions = CommitPair.ofTuple >> getFileChangesAtRev >> getFileAtRev >> MemberAnalysis.getRawData
+
             file 
             |> (Git.revs git >> ROP.tee Database.toTable)  // get from DB, if available?
-            |> (MemberAnalysis.getRawData git file
-                >> ROP.tee Database.toTable 
-                >> MemberAnalysis.asCsv 
-                >> writer (nameof MemberAnalysis))
+            |> List.pairwise // NOTE, unless there is some caching, this will do double the work unnecessarily
+            |> List.map (getMemberRevisions >> ROP.tee Database.toTable)
+            |> List.collect id
+            |> (MemberAnalysis.asCsv >> writer (nameof MemberAnalysis))
 
             printDone "MethodAnalysis"
         

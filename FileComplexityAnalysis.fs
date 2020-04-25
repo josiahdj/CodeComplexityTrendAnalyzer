@@ -41,10 +41,10 @@ module ComplexityStats =
         { Count = count; Total = total; Min = min; Max = max; Mean = mean; StdDev = stdDev }
 
 type FileComplexity = {
-        Hash : string
-        Date : string
-        Author : string
-        Complexity : ComplexityStats
+        Hash: string
+        Date: string
+        Author: string
+        Complexity: ComplexityStats
     }
 module FileComplexityAnalysis = 
     let getRawData git file revs =

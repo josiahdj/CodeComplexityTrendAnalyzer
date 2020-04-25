@@ -116,8 +116,8 @@ module Git =
                 else
                     UnchangedLine s
 
-    let getFileChangesAtRev git file revBefore revAfter =
-        logger.Information("Parsing Hunks from {File}, Rev {RevBefore} to Rev {RevAfter} =========================================", file, revBefore, revAfter)
+    let getFileChangesAtRev git file (revBefore : CommitInfo) (revAfter : CommitInfo) =
+        logger.Information("Parsing Hunks from {File}, Rev {RevBefore} to Rev {RevAfter} =========================================", file, revBefore.Hash, revAfter.Hash)
         let toHunks lines =
             //dumpToFile (sprintf "%s-%s--%s.diff" file revBefore revAfter) lines
             let rec toHunks' hunks lineNum lines' = 
@@ -167,12 +167,12 @@ module Git =
 
         let toFileChanges l =
             { File = file; 
-              Hash = revBefore; 
+              Hash = revBefore.Hash; 
               DiffHunk = l }
 
         let theFile = String.replace "\\" "/" file
         
-        unifiedDiff git revBefore revAfter theFile
+        unifiedDiff git revBefore.Hash revAfter.Hash theFile
         |> toHunks
         |> List.map toFileChanges
         |> List.rev
