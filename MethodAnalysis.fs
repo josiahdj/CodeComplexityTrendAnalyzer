@@ -3,8 +3,27 @@ namespace CodeComplexityTrendAnalyzer
 type MemberType = | Constructor | Method | Property
 type MemberInfo = { Name: string; Type: MemberType; Parameters: string option; LineCount: int; Complexity: ComplexityStats option }
 type MemberRevision = { Commit: CommitInfo; Member: MemberInfo; LinesAdded: int; LinesRemoved: int }
+    with 
+        static member Header = "hash,date,author,kind,member,loc,complex_tot,complex_avg,loc_added,loc_removed"
+        member this.Row = 
+            let commit = this.Commit
+            let memberInfo = this.Member
+            let complexity = this.Member.Complexity |> Option.defaultWith (fun () -> ComplexityStats.create [])
+
+            sprintf "%s,%s,%s,%A,%s,%i,%i,%.2f,%i,%i"
+                commit.Hash 
+                commit.Date 
+                commit.Author 
+                memberInfo.Type
+                memberInfo.Name 
+                memberInfo.LineCount
+                complexity.Total
+                complexity.Mean
+                this.LinesAdded 
+                this.LinesRemoved
+
 type CommitPair = { Previous: CommitInfo; Current: CommitInfo }
-    with
+    with 
         static member ofTuple(prev, curr) = { Previous = prev; Current = curr }
 type CommitDiffs = CommitPair * FileRevision list
 type CodeToDiff = { Commit: CommitInfo; FileRevisions: FileRevision list; PreviousCode: string; CurrentCode: string }
@@ -162,25 +181,8 @@ module MemberAnalysis =
         |> getMemberRevisions
             
     let asCsv (mrs : MemberRevision list) =
-        let asCsv' (memberRev : MemberRevision) =
-            let revision = memberRev.Commit
-            let methodInfo = memberRev.Member
-            let complexity = memberRev.Member.Complexity |> Option.defaultWith (fun () -> ComplexityStats.create [])
-
-            sprintf "%s,%s,%s,%A,%s,%i,%i,%.2f,%i,%i"
-                revision.Hash 
-                revision.Date 
-                revision.Author 
-                methodInfo.Type
-                methodInfo.Name 
-                methodInfo.LineCount
-                complexity.Total
-                complexity.Mean
-                memberRev.LinesAdded 
-                memberRev.LinesRemoved
-
         [
-            yield sprintf "hash,date,author,kind,member,loc,complex_tot,complex_avg,loc_added,loc_removed"
-            yield! mrs |> List.map asCsv'
+            MemberRevision.Header
+            yield! mrs |> List.map (fun mr -> mr.Row)
         ]
          

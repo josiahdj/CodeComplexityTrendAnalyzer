@@ -8,20 +8,11 @@ type FileComplexity = {
         Commit: CommitInfo
         Complexity: ComplexityStats
     }
-
-module FileComplexityAnalysis = 
-    let getFileAtRev git file (commit : CommitInfo) =
-        Git.getFileAtRevMemoized git file commit
-
-    let toFileComplexity (commit, code) = 
-        let complexity = ComplexityStats.create code
-        { Commit = commit
-          Complexity = complexity }
-
-    let asCsv fcs =
-        let asCsv' fc =
-            let commit = fc.Commit
-            let complexity = fc.Complexity
+    with
+        static member Header = "hash,date,author,num_lines,total_complex,avg_complex,sd"
+        member this.Row = 
+            let commit = this.Commit
+            let complexity = this.Complexity
             sprintf "%s,%s,%s,%i,%i,%.2f,%.2f" 
                 commit.Hash 
                 commit.Date 
@@ -31,8 +22,15 @@ module FileComplexityAnalysis =
                 complexity.Mean 
                 complexity.StdDev
 
+module FileComplexityAnalysis = 
+    let toFileComplexity (commit, code) = 
+        let complexity = ComplexityStats.create code
+        { Commit = commit
+          Complexity = complexity }
+
+    let asCsv (fcs : FileComplexity list) =
         [
-            yield sprintf "hash,date,author,num_lines,total_complex,avg_complex,sd"
-            yield! fcs |> List.map asCsv'
+            FileComplexity.Header
+            yield! fcs |> List.map (fun fc -> fc.Row)
         ]
         

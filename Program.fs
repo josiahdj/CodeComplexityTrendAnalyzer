@@ -35,8 +35,7 @@ let main argv =
         let repo = argResults.PostProcessResult (<@ Repository_Path @>, DirectoryInfo.ofPath)
         let file = argResults.GetResult Source_File
         let output = argResults.Contains Output_File
-
-        let git = Git.gitResult repo.FullName
+                
 
         let outputName n = 
             if output then
@@ -48,12 +47,12 @@ let main argv =
             else 
                 n
 
-        let writeLine name s = 
-            match output with
-            | true -> appendToFile name s
-            | false -> Console.Out.WriteLine(sprintf "%s: %s" name s)
-
         let writer name ss =
+            let writeLine name s = 
+                match output with
+                | true -> appendToFile name s
+                | false -> Console.Out.WriteLine(sprintf "%s: %s" name s)
+
             ss |> Seq.iter (writeLine (outputName name))
 
         let printDone n =
@@ -61,6 +60,8 @@ let main argv =
             if output then Console.Out.WriteLine("Done. Check for output file {0}", out)
             else Console.Out.WriteLine("Done with {0}.", out)
 
+
+        let git = Git.gitResult repo.FullName
         let revs = file |> (Git.revs git >> List.map (ROP.tee Database.toTable))
 
         if cmd = All || cmd = Members then
@@ -80,10 +81,10 @@ let main argv =
             printDone "MethodAnalysis"
         
         if cmd = All || cmd = File then
-            let getFileAtRev = FileComplexityAnalysis.getFileAtRev git file
+            let getFileAtRev = Git.getFileAtRevMemoized git file
 
             revs
-            |> List.map (getFileAtRev 
+            |> List.map (getFileAtRev
                          >> FileComplexityAnalysis.toFileComplexity
                          >> ROP.tee Database.toTable)
             |> (FileComplexityAnalysis.asCsv >> writer (nameof FileComplexityAnalysis))
