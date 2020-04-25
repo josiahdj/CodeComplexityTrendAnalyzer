@@ -15,8 +15,8 @@ module MemberAnalysis =
     open Fake.Core
     
     let analyze git file =
-        let parseRevPair (prev, curr) =
-            Git.parseRev prev, Git.parseRev curr
+        let parseRevPair (prevHash, currHash) =
+            Git.parseRev prevHash, Git.parseRev currHash
 
         let memoize f =
             let cache = ref Map.empty
@@ -29,22 +29,22 @@ module MemberAnalysis =
                     res
 
         let getFileChangesAtRevMemoized = memoize (Git.getFileChangesAtRev git file)
-        let getFileChangesAtRev' ((revBefore, revAfter) : CommitInfo * CommitInfo) =
-            let diffs = getFileChangesAtRevMemoized revBefore.Hash revAfter.Hash
-            revBefore, revAfter, diffs
+        let getFileChangesAtRev' ((prevCommit, currCommit) : CommitInfo * CommitInfo) =
+            let diffs = getFileChangesAtRevMemoized prevCommit.Hash currCommit.Hash
+            prevCommit, currCommit, diffs
 
         let getFileAtRevMemoized = memoize (Git.getFileAtRev git file)
-        let getFileAtRev' ((revBefore, revAfter, diffs) : CommitInfo * CommitInfo * FileRevision list) =
-            let codeBefore = getFileAtRevMemoized revBefore.Hash |> String.toLines
+        let getFileAtRev' ((prevCommit, currCommit, diffs) : CommitInfo * CommitInfo * FileRevision list) =
+            let prevCode = getFileAtRevMemoized prevCommit.Hash |> String.toLines
             //dumpToFile (sprintf "%s-Before-%s.cs" file revBefore.Hash) (Strings.splitLines codeBefore)
-            let codeAfter = getFileAtRevMemoized revAfter.Hash |> String.toLines
+            let currCode = getFileAtRevMemoized currCommit.Hash |> String.toLines
             //dumpToFile (sprintf "%s-After-%s.cs" file revAfter.Hash) (Strings.splitLines codeAfter)
-            revAfter, diffs, codeBefore, codeAfter
+            currCommit, diffs, prevCode, currCode
 
         let distinctMemberInfos (ms : MemberInfo list) = ms |> List.distinctBy (fun m -> sprintf "%s-%s" (m.Type.ToString()) m.Name)
         let parameters (pl : ParameterListSyntax) = pl.Parameters.ToList() |> Seq.map (fun p -> p.ToString()) |> Seq.sort |> String.concat ","
 
-        let getMemberInfos (astBefore : SyntaxTree) (astAfter : SyntaxTree)  (diff : FileRevision) =
+        let getMemberInfos (prevAst : SyntaxTree) (currAst : SyntaxTree)  (diff : FileRevision) =
             let tryGetMemberInfo (ast : SyntaxTree) lineNumber =
                 let lines = ast.GetText().Lines
                 if lineNumber < lines.Count then
@@ -79,9 +79,9 @@ module MemberAnalysis =
 
             let getSource op = 
                 match op with 
-                | AddLine -> astAfter
-                | RemoveLine -> astBefore
-                | LeaveLine -> astAfter
+                | AddLine -> currAst
+                | RemoveLine -> prevAst
+                | LeaveLine -> currAst
 
             let rec getMemberInfos' ms lcs =
                 match lcs with
@@ -150,19 +150,19 @@ module MemberAnalysis =
                 //|> List.map (getMemberStats astAfter)
                 //|> List.filter (fun m -> m.Complexity.IsSome)
                 let mis = getMemberInfos' Set.empty diff.DiffHunk.LineChanges |> Set.toList
-                let misWithStats = List.map (getMemberStats astAfter) mis |> List.filter (fun m -> m.Complexity.IsSome)
+                let misWithStats = List.map (getMemberStats currAst) mis |> List.filter (fun m -> m.Complexity.IsSome)
                 misWithStats
 
             diff, ms
 
 
-        let getMemberRevisions ((rev, diffs, codeBefore, codeAfter) : CommitInfo * FileRevision list * string * string) =
+        let getMemberRevisions ((rev, diffs, prevCode, currCode) : CommitInfo * FileRevision list * string * string) =
             let parseCode (code : string) =
                 let st = SourceText.From(code);
                 SyntaxFactory.ParseSyntaxTree(st);
 
-            let astBefore = parseCode codeBefore
-            let astAfter = parseCode codeAfter
+            let astBefore = parseCode prevCode
+            let astAfter = parseCode currCode
 
             let getMemberInfos' = getMemberInfos astBefore astAfter
             let toRevisionInfos (d, ms) = 
