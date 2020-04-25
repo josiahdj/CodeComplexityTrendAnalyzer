@@ -13,7 +13,9 @@ module ComplexityStats =
     let create (lines : string list) =
         let values =
             let lineComplexity (line : string) =
-                // count indentations as a proxy for complexity; see: http://softwareprocess.es/static/WhiteSpace.html
+                // count indentations as a proxy for complexity; see: 
+                // http://softwareprocess.es/static/WhiteSpace.html
+                // https://empear.com/blog/bumpy-road-code-complexity-in-context/
                 (Strings.countLeadingSpaces line)/4 + (Strings.countLeadingTabs line)
             
             let lineComplexities = 
@@ -38,20 +40,18 @@ module ComplexityStats =
 
         { Count = count; Total = total; Min = min; Max = max; Mean = mean; StdDev = stdDev }
 
-module FileAnalysis = 
-    open FSharp.Collections.ParallelSeq
-    
+module FileComplexityAnalysis = 
     let getRawData git file =
-        let getFileAtRev' revInfo =
-            let { Hash = rev; Date = date; Author = author } = revInfo
-            rev, date, author, Git.getFileAtRev git file rev
+        let getFileAtRev' commit =
+            let { Hash = hash; Date = date; Author = author } = commit
+            hash, date, author, Git.getFileAtRev git file hash
 
         let asComplexityStat = 
-            fun (rev, date, author, cs) -> rev, date, author, ComplexityStats.create cs
+            fun (rev, date, author, code) -> rev, date, author, ComplexityStats.create code
 
         let fileComplexityTrend = Git.parseRev >> getFileAtRev' >> asComplexityStat
 
-        Git.revs git file |> PSeq.map fileComplexityTrend
+        Git.revs git file |> List.map fileComplexityTrend
 
     let asCsv ss =
         let asCsv' =

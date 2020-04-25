@@ -17,7 +17,7 @@ with
     interface IArgParserTemplate with
         member x.Usage =
             match x with
-            | Command _ -> "Choose 'members' to return the member-level (constructors, methods, properties) file analysis; choose 'file' to return the file-level analysis; choose 'all' to run both."
+            | Command _ -> "Choose 'members' to return the member-level (constructors, methods, properties) file analysis; choose 'file' to return the file-level complexity growth analysis; choose 'all' to run both."
             | Repository_Path _ -> "Specify a repository path, e.g. C:\repo_root_dir"
             | Source_File _ -> "Specify a source file to be analyzed. The path is relalive to the repository directory, e.g. path/to/file.ext"
             | Output_File _ -> "Output results to a file. The analysis files will be named after the source file. The binary's directory will be used."
@@ -72,10 +72,10 @@ let main argv =
         
         if cmd = All || cmd = File then
             file
-            |> FileAnalysis.getRawData git
+            |> FileComplexityAnalysis.getRawData git
             |> ROP.tee Database.toTable
-            |> FileAnalysis.asCsv 
-            |> writer (nameof FileAnalysis)
+            |> FileComplexityAnalysis.asCsv 
+            |> writer (nameof FileComplexityAnalysis)
 
             printDone "FileComplexity"
 
