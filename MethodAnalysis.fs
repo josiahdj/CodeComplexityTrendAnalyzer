@@ -170,28 +170,31 @@ module MemberAnalysis =
             |> List.collect id
             |> tee (fun ms -> logger.Information("Found {MemberCount} members in Revision {Revision} by {Author} on {Date}", ms.Length, rev.Hash, rev.Author, rev.Date))
  
-        let asCsv (methodRev : MemberRevision) =
-            let revision = methodRev.Commit
-            let methodInfo = methodRev.Member
-            let complexity = methodRev.Member.Complexity |> Option.defaultWith (fun () -> ComplexityStats.create [])
+        let asCsv mrs =
+            seq {
+                yield sprintf "hash,date,author,kind,member,loc,complex_tot,complex_avg,loc_added,loc_removed"
+                yield! Seq.map (fun methodRev -> 
+                    let revision = methodRev.Commit
+                    let methodInfo = methodRev.Member
+                    let complexity = methodRev.Member.Complexity |> Option.defaultWith (fun () -> ComplexityStats.create [])
 
-            sprintf "%s,%s,%s,%A,%s,%i,%i,%.2f,%i,%i"
-                revision.Hash 
-                revision.Date 
-                revision.Author 
-                methodInfo.Type
-                methodInfo.Name 
-                methodInfo.LineCount
-                complexity.Total
-                complexity.Mean
-                methodRev.LinesAdded 
-                methodRev.LinesRemoved
+                    sprintf "%s,%s,%s,%A,%s,%i,%i,%.2f,%i,%i"
+                        revision.Hash 
+                        revision.Date 
+                        revision.Author 
+                        methodInfo.Type
+                        methodInfo.Name 
+                        methodInfo.LineCount
+                        complexity.Total
+                        complexity.Mean
+                        methodRev.LinesAdded 
+                        methodRev.LinesRemoved
+                ) mrs
+            }
              
-        seq {
-            yield sprintf "hash,date,author,kind,member,loc,complex_tot,complex_avg,loc_added,loc_removed"
-            yield! Git.revs git file
-                    |> List.pairwise // NOTE, unless there is some caching, this will do double the work unnecessarily
-                    |> List.map (parseRevPair >> getFileChangesAtRev' >> getFileAtRev' >> getMemberRevisions)
-                    |> List.collect id
-                    |> List.map asCsv
-        }
+        Git.revs git file
+            |> List.pairwise // NOTE, unless there is some caching, this will do double the work unnecessarily
+            |> List.map (parseRevPair >> getFileChangesAtRev' >> getFileAtRev' >> getMemberRevisions)
+            |> List.collect id
+            |> asCsv
+        
