@@ -52,6 +52,10 @@ module Git =
         let gitCmd = sprintf "show %s:%s" rev theFile
         git gitCmd
 
+    let unifiedDiff git revBefore revAfter theFile = 
+        let gitCmd = sprintf "diff %s..%s --unified=0 -- %s" revBefore revAfter theFile
+        git gitCmd 
+
     let private lineInfoRegex = Regex("@@ -(?<before_line>[0-9]+)(,(?<before_line_count>[0-9]+))? \+(?<after_line>[0-9]+)(,(?<after_line_count>[0-9]+))?( @@) ?(?<member>.*?)$", RegexOptions.Compiled)
     let private isLineInfo s =
         let matches = lineInfoRegex.Match(s)
@@ -163,9 +167,8 @@ module Git =
               DiffHunk = l }
 
         let theFile = String.replace "\\" "/" file
-        let gitCmd = sprintf "diff %s..%s --unified=0 -- %s" revBefore revAfter theFile
-
-        git gitCmd 
+        
+        unifiedDiff git revBefore revAfter theFile
         |> toHunks
         |> List.map toFileChanges
         |> List.rev
