@@ -52,19 +52,19 @@ module Git =
         let gitCmd = sprintf "show %s:%s" rev theFile
         git gitCmd
 
-    let lineInfoRegex = Regex("@@ -(?<before_line>[0-9]+)(,(?<before_line_count>[0-9]+))? \+(?<after_line>[0-9]+)(,(?<after_line_count>[0-9]+))?( @@) ?(?<member>.*?)$", RegexOptions.Compiled)
-    let isLineInfo s =
+    let private lineInfoRegex = Regex("@@ -(?<before_line>[0-9]+)(,(?<before_line_count>[0-9]+))? \+(?<after_line>[0-9]+)(,(?<after_line_count>[0-9]+))?( @@) ?(?<member>.*?)$", RegexOptions.Compiled)
+    let private isLineInfo s =
         let matches = lineInfoRegex.Match(s)
         let isMatch = matches.Success && matches.Groups.Count > 0
         (isMatch, matches.Groups)
 
-    let groupValue (name : string) (grps : GroupCollection) =
+    let private groupValue (name : string) (grps : GroupCollection) =
         if grps.[name].Success then
             Some grps.[name].Value
         else 
             None
 
-    let toLineInfo grps =
+    let private toLineInfo grps =
         let memberName = grps |> groupValue "member"
         let beforeLine = grps |> groupValue "before_line" |> Option.map int
         let beforeLineCount = grps |> groupValue "before_line_count" |> Option.map int
@@ -80,21 +80,21 @@ module Git =
           LinesAdded = 0
           LinesRemoved = 0}
 
-    let lineChangeRegex = Regex("^(?<op>\+|\-)(?<line>[^+-].*?)$", RegexOptions.Compiled) // unfortunately (or fortunately) eliminates add/remove of empty lines
-    let isLineChange s =
+    let private lineChangeRegex = Regex("^(?<op>\+|\-)(?<line>[^+-].*?)$", RegexOptions.Compiled) // unfortunately (or fortunately) eliminates add/remove of empty lines
+    let private isLineChange s =
         let matches = lineChangeRegex.Match(s)
         let isMatch = matches.Success && matches.Groups.Count > 0
         (isMatch, matches.Groups)
 
-    let toLineChange grps =
+    let private toLineChange grps =
         let op = grps |> groupValue "op" |> Option.map (fun s -> match s with | "+" -> AddLine | "-" -> RemoveLine | _ -> LeaveLine) |> Option.get
         let line = grps |> groupValue "line" |> Option.defaultValue String.Empty
         { Operation = op; LineNumber = 0; Text = line }
 
-    let diffHeaderRegex = Regex("^(diff|index|---|\+\+\+) ", RegexOptions.Compiled)
-    let isDiffHeader s = diffHeaderRegex.IsMatch s
+    let private diffHeaderRegex = Regex("^(diff|index|---|\+\+\+) ", RegexOptions.Compiled)
+    let private isDiffHeader s = diffHeaderRegex.IsMatch s
         
-    let (|LineInfo|LineChange|DiffHeader|UnchangedLine|) s = 
+    let private (|LineInfo|LineChange|DiffHeader|UnchangedLine|) s = 
         let isInfo, grps = isLineInfo s
         if isInfo then
             LineInfo (toLineInfo grps)
