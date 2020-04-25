@@ -18,11 +18,11 @@ module MemberAnalysis =
     open Microsoft.CodeAnalysis
     open Fake.Core
 
-    let getFileChangesAtRev git file (commitPair : CommitPair) : CommitDiffs =
-        let diffs = Git.getFileChangesAtRevMemoized git file commitPair.Previous commitPair.Current
+    let getDiffsBetweenCommits git file (commitPair : CommitPair) : CommitDiffs =
+        let diffs = Git.getFileChangesBetweenCommitsMemoized git file commitPair.Previous commitPair.Current
         commitPair, diffs
 
-    let getFileAtRev git file (commitDiffs : CommitDiffs) : CodeToDiff =
+    let getFilesForCommits git file (commitDiffs : CommitDiffs) : CodeToDiff =
         let (commitPair, diffs) = commitDiffs
         let toLines (_,ls) = String.toLines ls
         let prevCode = Git.getFileAtRevMemoized git file commitPair.Previous |> toLines
@@ -31,7 +31,7 @@ module MemberAnalysis =
         //dumpToFile (sprintf "%s-After-%s.cs" file revAfter.Hash) (Strings.splitLines codeAfter)
         { Commit = commitPair.Current; FileRevisions = diffs; PreviousCode = prevCode; CurrentCode = currCode }
 
-    let getRawData (revs : CodeToDiff) =
+    let getMemberChangeData (revs : CodeToDiff) =
         let distinctMemberInfos (ms : MemberInfo list) = ms |> List.distinctBy (fun m -> sprintf "%s-%s" (m.Type.ToString()) m.Name)
         let parameters (pl : ParameterListSyntax) = pl.Parameters.ToList() |> Seq.map (fun p -> p.ToString()) |> Seq.sort |> String.concat ","
 

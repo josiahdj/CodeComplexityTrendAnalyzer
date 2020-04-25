@@ -42,9 +42,6 @@ module Git =
         let parts = String.splitStr "--" commit
         { Hash = parts.[0]; Date = parts.[1]; Author = parts.[2] }
     
-    let parseRevPair (prevHash, currHash) =
-        parseRev prevHash, parseRev currHash
-
     let revs git filePath = 
         let gitCmd = sprintf "log --date=short --pretty=format:%%h--%%ad--%%an %s" filePath
         git gitCmd 
@@ -119,7 +116,7 @@ module Git =
                 else
                     UnchangedLine s
 
-    let getFileChangesAtRev git file (revBefore : CommitInfo) (revAfter : CommitInfo) =
+    let getFileChangesBetweenCommits git file (revBefore : CommitInfo) (revAfter : CommitInfo) =
         logger.Information("Parsing Hunks from {File}, Rev {RevBefore} to Rev {RevAfter} =========================================", file, revBefore.Hash, revAfter.Hash)
         let toHunks lines =
             //dumpToFile (sprintf "%s-%s--%s.diff" file revBefore revAfter) lines
@@ -180,4 +177,4 @@ module Git =
         |> List.map toFileChanges
         |> List.rev
 
-    let getFileChangesAtRevMemoized git file = Caching.memoize (getFileChangesAtRev git file)
+    let getFileChangesBetweenCommitsMemoized git file = Caching.memoize (getFileChangesBetweenCommits git file)

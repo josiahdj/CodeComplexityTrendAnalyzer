@@ -64,15 +64,15 @@ let main argv =
         let revs = file |> (Git.revs git >> List.map (ROP.tee Database.toTable))
 
         if cmd = All || cmd = Members then
-            let getFileChangesAtRev = MemberAnalysis.getFileChangesAtRev git file
-            let getFileAtRev = MemberAnalysis.getFileAtRev git file 
+            let getDiffsBetweenCommits = MemberAnalysis.getDiffsBetweenCommits git file
+            let getFilesForCommits = MemberAnalysis.getFilesForCommits git file 
 
             revs
             |> List.pairwise // NOTE, unless there is some caching, this will do double the work unnecessarily
             |> List.map (CommitPair.ofTuple 
-                         >> getFileChangesAtRev 
-                         >> getFileAtRev 
-                         >> MemberAnalysis.getRawData 
+                         >> getDiffsBetweenCommits 
+                         >> getFilesForCommits 
+                         >> MemberAnalysis.getMemberChangeData 
                          >> List.map (ROP.tee Database.toTable))
             |> List.collect id
             |> (MemberAnalysis.asCsv >> writer (nameof MemberAnalysis))
