@@ -41,21 +41,24 @@ module ComplexityStats =
 module FileAnalysis = 
     open FSharp.Collections.ParallelSeq
     
-    let analyze git file =
+    let getRawData git file =
         let getFileAtRev' revInfo =
             let { Hash = rev; Date = date; Author = author } = revInfo
             rev, date, author, Git.getFileAtRev git file rev
 
-        let asCsv (rev, date, author, stat : ComplexityStats) =
-            sprintf "%s,%s,%s,%i,%i,%.2f,%.2f" rev date author stat.Count stat.Total stat.Mean stat.StdDev
+        let asComplexityStat = 
+            fun (rev, date, author, cs) -> rev, date, author, ComplexityStats.create cs
 
-        let fileComplexityTrendAsCsv = 
-            Git.parseRev 
-            >> getFileAtRev'
-            >> (fun (rev, date, author, cs) -> rev, date, author, ComplexityStats.create cs) 
-            >> asCsv 
+        let fileComplexityTrend = Git.parseRev >> getFileAtRev' >> asComplexityStat
+
+        Git.revs git file |> PSeq.map fileComplexityTrend
+
+    let asCsv ss =
+        let asCsv' =
+            fun (rev, date, author, stat) -> sprintf "%s,%s,%s,%i,%i,%.2f,%.2f" rev date author stat.Count stat.Total stat.Mean stat.StdDev
 
         seq { 
             yield sprintf "hash,date,author,num_lines,total_complex,avg_complex,sd"
-            yield! Git.revs git file |> PSeq.map fileComplexityTrendAsCsv
+            yield! ss |> Seq.map asCsv'
         }
+        
