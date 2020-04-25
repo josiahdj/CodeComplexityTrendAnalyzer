@@ -62,15 +62,21 @@ let main argv =
             else Console.Out.WriteLine("Done with {0}.", out)
 
         if cmd = All || cmd = Members then
-            MemberAnalysis.getRawData git file 
+            file 
+            |> MemberAnalysis.getRawData git 
+            |> ROP.tee Database.toTable
             |> MemberAnalysis.asCsv 
             |> writer (nameof MemberAnalysis)
+
             printDone "MethodAnalysis"
         
         if cmd = All || cmd = File then
-            FileAnalysis.getRawData git file 
+            file
+            |> FileAnalysis.getRawData git
+            |> ROP.tee Database.toTable
             |> FileAnalysis.asCsv 
             |> writer (nameof FileAnalysis)
+
             printDone "FileComplexity"
 
 
