@@ -61,27 +61,32 @@ let main argv =
             if output then Console.Out.WriteLine("Done. Check for output file {0}", out)
             else Console.Out.WriteLine("Done with {0}.", out)
 
+        let revs = file |> (Git.revs git >> List.map (ROP.tee Database.toTable))
+
         if cmd = All || cmd = Members then
             let getFileChangesAtRev = MemberAnalysis.getFileChangesAtRev git file
             let getFileAtRev = MemberAnalysis.getFileAtRev git file 
-            let getMemberRevisions = CommitPair.ofTuple >> getFileChangesAtRev >> getFileAtRev >> MemberAnalysis.getRawData
 
-            file 
-            |> (Git.revs git >> ROP.tee Database.toTable)  // get from DB, if available?
+            revs
             |> List.pairwise // NOTE, unless there is some caching, this will do double the work unnecessarily
-            |> List.map (getMemberRevisions >> ROP.tee Database.toTable)
+            |> List.map (CommitPair.ofTuple 
+                         >> getFileChangesAtRev 
+                         >> getFileAtRev 
+                         >> MemberAnalysis.getRawData 
+                         >> List.map (ROP.tee Database.toTable))
             |> List.collect id
             |> (MemberAnalysis.asCsv >> writer (nameof MemberAnalysis))
 
             printDone "MethodAnalysis"
         
         if cmd = All || cmd = File then
-            file
-            |> (Git.revs git >> ROP.tee Database.toTable)  // get from DB, if available?
-            |> (FileComplexityAnalysis.getRawData git file
-                >> ROP.tee Database.toTable
-                >> FileComplexityAnalysis.asCsv 
-                >> writer (nameof FileComplexityAnalysis))
+            let getFileAtRev = FileComplexityAnalysis.getFileAtRev git file
+
+            revs
+            |> List.map (getFileAtRev 
+                         >> FileComplexityAnalysis.toFileComplexity
+                         >> ROP.tee Database.toTable)
+            |> (FileComplexityAnalysis.asCsv >> writer (nameof FileComplexityAnalysis))
 
             printDone "FileComplexity"
 

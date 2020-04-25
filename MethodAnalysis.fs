@@ -36,9 +36,10 @@ module MemberAnalysis =
     let private getFileAtRevMemoized git file = memoize (Git.getFileAtRev git file)
     let getFileAtRev git file (commitDiffs : CommitDiffs) : CodeToDiff =
         let (commitPair, diffs) = commitDiffs
-        let prevCode = getFileAtRevMemoized git file commitPair.Previous.Hash |> String.toLines
+        let toLines (_,ls) = String.toLines ls
+        let prevCode = getFileAtRevMemoized git file commitPair.Previous |> toLines
         //dumpToFile (sprintf "%s-Before-%s.cs" file revBefore.Hash) (Strings.splitLines codeBefore)
-        let currCode = getFileAtRevMemoized git file commitPair.Current.Hash |> String.toLines
+        let currCode = getFileAtRevMemoized git file commitPair.Current |> toLines
         //dumpToFile (sprintf "%s-After-%s.cs" file revAfter.Hash) (Strings.splitLines codeAfter)
         { Commit = commitPair.Current; FileRevisions = diffs; PreviousCode = prevCode; CurrentCode = currCode }
 
@@ -190,8 +191,8 @@ module MemberAnalysis =
                 memberRev.LinesAdded 
                 memberRev.LinesRemoved
 
-        seq {
+        [
             yield sprintf "hash,date,author,kind,member,loc,complex_tot,complex_avg,loc_added,loc_removed"
-            yield! mrs |> Seq.map asCsv'
-        }
+            yield! mrs |> List.map asCsv'
+        ]
          

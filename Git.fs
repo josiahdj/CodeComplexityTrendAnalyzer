@@ -51,10 +51,11 @@ module Git =
         |> List.map parseRev
         |> List.rev
 
-    let getFileAtRev git file rev : string list =
+    let getFileAtRev git file (commit : CommitInfo) : CommitInfo * string list =
         let theFile = String.replace "\\" "/" file
-        let gitCmd = sprintf "show %s:%s" rev theFile
-        git gitCmd
+        let gitCmd = sprintf "show %s:%s" commit.Hash theFile
+        let code = git gitCmd
+        commit, code
 
     let unifiedDiff git revBefore revAfter theFile = 
         let gitCmd = sprintf "diff %s..%s --unified=0 -- %s" revBefore revAfter theFile
