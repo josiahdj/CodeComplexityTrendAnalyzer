@@ -40,25 +40,43 @@ module ComplexityStats =
 
         { Count = count; Total = total; Min = min; Max = max; Mean = mean; StdDev = stdDev }
 
+type FileComplexity = {
+        Hash : string
+        Date : string
+        Author : string
+        Complexity : ComplexityStats
+    }
 module FileComplexityAnalysis = 
     let getRawData git file =
         let getFileAtRev' commit =
-            let { Hash = hash; Date = date; Author = author } = commit
+            let { CommitInfo.Hash = hash; Date = date; Author = author } = commit
             hash, date, author, Git.getFileAtRev git file hash
 
-        let asComplexityStat = 
-            fun (rev, date, author, code) -> rev, date, author, ComplexityStats.create code
+        let asComplexityStat (rev, date, author, code) = 
+            let complexity = ComplexityStats.create code
+            { Hash = rev
+              Date = date
+              Author = author
+              Complexity = complexity }
 
         let fileComplexityTrend = Git.parseRev >> getFileAtRev' >> asComplexityStat
 
         Git.revs git file |> List.map fileComplexityTrend
 
-    let asCsv ss =
-        let asCsv' =
-            fun (rev, date, author, stat) -> sprintf "%s,%s,%s,%i,%i,%.2f,%.2f" rev date author stat.Count stat.Total stat.Mean stat.StdDev
+    let asCsv fcs =
+        let asCsv' fc =
+            let complexity = fc.Complexity
+            sprintf "%s,%s,%s,%i,%i,%.2f,%.2f" 
+                fc.Hash 
+                fc.Date 
+                fc.Author 
+                complexity.Count 
+                complexity.Total 
+                complexity.Mean 
+                complexity.StdDev
 
         seq { 
             yield sprintf "hash,date,author,num_lines,total_complex,avg_complex,sd"
-            yield! ss |> Seq.map asCsv'
+            yield! fcs |> Seq.map asCsv'
         }
         
