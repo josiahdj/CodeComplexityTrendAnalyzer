@@ -11,7 +11,7 @@ type FileComplexity = {
 
 module FileComplexityAnalysis = 
     let getFileAtRev git file (commit : CommitInfo) =
-        Git.getFileAtRev git file commit
+        Git.getFileAtRevMemoized git file commit
 
     let toFileComplexity (commit, code) = 
         let complexity = ComplexityStats.create code

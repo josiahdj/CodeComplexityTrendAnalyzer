@@ -57,6 +57,8 @@ module Git =
         let code = git gitCmd
         commit, code
 
+    let getFileAtRevMemoized git file = Caching.memoize (getFileAtRev git file)
+
     let unifiedDiff git revBefore revAfter theFile = 
         let gitCmd = sprintf "diff %s..%s --unified=0 -- %s" revBefore revAfter theFile
         git gitCmd 
@@ -177,3 +179,5 @@ module Git =
         |> toHunks
         |> List.map toFileChanges
         |> List.rev
+
+    let getFileChangesAtRevMemoized git file = Caching.memoize (getFileChangesAtRev git file)

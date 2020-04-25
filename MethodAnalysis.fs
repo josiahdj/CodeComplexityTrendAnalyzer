@@ -18,28 +18,16 @@ module MemberAnalysis =
     open Microsoft.CodeAnalysis
     open Fake.Core
 
-    let private memoize f =
-        let cache = ref Map.empty
-        fun x ->
-            match (!cache).TryFind(x) with
-            | Some res -> res
-            | None ->
-                let res = f x
-                cache := (!cache).Add(x,res)
-                res
-
-    let private getFileChangesAtRevMemoized git file = memoize (Git.getFileChangesAtRev git file)
     let getFileChangesAtRev git file (commitPair : CommitPair) : CommitDiffs =
-        let diffs = getFileChangesAtRevMemoized git file commitPair.Previous commitPair.Current
+        let diffs = Git.getFileChangesAtRevMemoized git file commitPair.Previous commitPair.Current
         commitPair, diffs
 
-    let private getFileAtRevMemoized git file = memoize (Git.getFileAtRev git file)
     let getFileAtRev git file (commitDiffs : CommitDiffs) : CodeToDiff =
         let (commitPair, diffs) = commitDiffs
         let toLines (_,ls) = String.toLines ls
-        let prevCode = getFileAtRevMemoized git file commitPair.Previous |> toLines
+        let prevCode = Git.getFileAtRevMemoized git file commitPair.Previous |> toLines
         //dumpToFile (sprintf "%s-Before-%s.cs" file revBefore.Hash) (Strings.splitLines codeBefore)
-        let currCode = getFileAtRevMemoized git file commitPair.Current |> toLines
+        let currCode = Git.getFileAtRevMemoized git file commitPair.Current |> toLines
         //dumpToFile (sprintf "%s-After-%s.cs" file revAfter.Hash) (Strings.splitLines codeAfter)
         { Commit = commitPair.Current; FileRevisions = diffs; PreviousCode = prevCode; CurrentCode = currCode }
 

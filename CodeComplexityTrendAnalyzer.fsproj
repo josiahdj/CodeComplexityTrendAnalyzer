@@ -11,6 +11,7 @@
     <Compile Include="Database.fs" />
     <Compile Include="ROP.fs" />
     <Compile Include="Strings.fs" />
+    <Compile Include="Caching.fs" />
     <Compile Include="Git.fs" />
     <Compile Include="ComplexityStats.fs" />
     <Compile Include="FileComplexityAnalysis.fs" />
