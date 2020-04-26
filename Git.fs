@@ -1,19 +1,5 @@
 ﻿namespace CodeComplexityTrendAnalyzer
 
-type CommitInfo = { Hash: string; Date: string; Author: string }
-type LineChangeOperation = | LeaveLine | AddLine | RemoveLine
-type LineChange = { Operation: LineChangeOperation; LineNumber: int; Text: string }
-type DiffHunk = { 
-    BeforeLine: int option
-    BeforeLineCount: int option
-    AfterLine: int option
-    AfterLineCount: int option
-    MemberName: string option
-    LineChanges: LineChange list
-    LinesAdded: int
-    LinesRemoved: int }
-type FileRevision = { File: string; Hash: string; DiffHunk: DiffHunk }
-
 [<RequireQualifiedAccess>]
 module LineChange =
     let toAbsolutePosition diff lineChange =
@@ -121,7 +107,7 @@ module Git =
         let toHunks lines =
             //dumpToFile (sprintf "%s-%s--%s.diff" file revBefore revAfter) lines
             let rec toHunks' hunks lineNum lines' = 
-                let updateDiffHunk dh chg dhs ln =
+                let updateDiffHunk (dh : DiffHunk) chg dhs ln =
                     let added, removed = 
                         match chg.Operation with
                         | AddLine -> dh.LinesAdded + 1, dh.LinesRemoved

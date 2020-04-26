@@ -1,26 +1,9 @@
-﻿open CodeComplexityTrendAnalyzer
+module CodeComplexityTrendAnalyzer.Program
+
 open Argu
 open Fake.IO
 open Fake.IO.FileSystemOperators
 open System
-
-type CliCommand =
-    | Members
-    | File
-    | All
-type CliArguments = 
-    | [<MainCommand; ExactlyOnce; First>] Command of command : CliCommand
-    | [<Mandatory; AltCommandLine("-r")>] Repository_Path of repo : string
-    | [<Mandatory; AltCommandLine("-s")>] Source_File of file : string
-    | [<AltCommandLine("-o")>] Output_File
-with 
-    interface IArgParserTemplate with
-        member x.Usage =
-            match x with
-            | Command _ -> "Choose 'members' to return the member-level (constructors, methods, properties) file analysis; choose 'file' to return the file-level complexity growth analysis; choose 'all' to run both."
-            | Repository_Path _ -> "Specify a repository path, e.g. C:\repo_root_dir"
-            | Source_File _ -> "Specify a source file to be analyzed. The path is relalive to the repository directory, e.g. path/to/file.ext"
-            | Output_File _ -> "Output results to a file. The analysis files will be named after the source file. The binary's directory will be used."
 
 [<EntryPoint>]
 let main argv =
