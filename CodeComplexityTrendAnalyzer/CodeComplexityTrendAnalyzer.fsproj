@@ -30,9 +30,19 @@
     <PackageReference Include="Serilog.Sinks.Literate" Version="3.0.0" />
     <PackageReference Include="Serilog.Sinks.RollingFile" Version="3.3.0" />
     <PackageReference Include="SQLProvider" Version="1.1.84" />
+    <PackageReference Include="System.Data.SqlClient" Version="4.8.1" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Update="FSharp.Core" Version="4.7.1" />
   </ItemGroup>
+  
+  <PropertyGroup>
+    <IsWindows Condition="'$(OS)' == 'Windows_NT'">true</IsWindows>
+  </PropertyGroup>
+  <!-- RUN: "nuget install System.Data.SqlClient -Version 4.8.1 -OutputDirectory ./packages -Framework NETCoreApp3.1 -ExcludeVersion" in project (this) folder -->
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Exec Command="copy .\packages\System.Data.SqlClient\runtimes\win\lib\netcoreapp2.1\System.Data.SqlClient.dll bin\Debug\netcoreapp3.1\" Condition="'$(IsWindows)' == 'true'" />
+    <Exec Command="cp ./packages/System.Data.SqlClient/runtimes/unix/lib/netcoreapp2.1/System.Data.SqlClient.dll bin/Debug/netcoreapp3.1/" Condition="'$(IsWindows)' != 'true'" />
+  </Target>
 </Project>

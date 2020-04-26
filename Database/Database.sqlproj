@@ -62,7 +62,7 @@
     <Folder Include="Tables\" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Database.publish.local.xml" />
+    <None Include="Database.local.publish.xml" />
   </ItemGroup>
   <ItemGroup>
     <Build Include="Tables\CommitInfo.sql" />
