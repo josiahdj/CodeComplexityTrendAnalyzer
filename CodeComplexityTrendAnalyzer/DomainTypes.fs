@@ -6,6 +6,7 @@ open Argu
 type CommitInfo = { Hash: string; Date: string; Author: string }
 type LineChangeOperation = | LeaveLine | AddLine | RemoveLine
 type LineChange = { Operation: LineChangeOperation; LineNumber: int; Text: string }
+
 type DiffHunk = { 
     BeforeLine: int option
     BeforeLineCount: int option
@@ -16,6 +17,19 @@ type DiffHunk = {
     LinesAdded: int
     LinesRemoved: int }
 type FileRevision = { File: string; Hash: string; DiffHunk: DiffHunk }
+
+[<RequireQualifiedAccess>]
+module LineChange =
+    let toAbsolutePosition diff lineChange =
+        let startLineForOp op =
+            match op with
+            | AddLine -> diff.AfterLine 
+            | RemoveLine -> diff.BeforeLine 
+            | LeaveLine -> diff.AfterLine 
+            |> Option.defaultValue 0
+        
+        let startLine = startLineForOp lineChange.Operation
+        startLine + lineChange.LineNumber - 1
 
 
 // ComplexityStats
