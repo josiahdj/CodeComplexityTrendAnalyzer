@@ -1,4 +1,4 @@
-module CodeComplexityTrendAnalyzer.Program
+﻿module CodeComplexityTrendAnalyzer.Program
 
 open Argu
 open Fake.IO
@@ -45,7 +45,7 @@ let main argv =
 
 
         let git = Git.gitResult repo.FullName
-        let revs = file |> (Git.revs git >> List.map (ROP.tee Database.toTable))
+        let revs = file |> (Git.revs git >> List.map (ROP.tee Database.saveCommitInfo))
 
         if cmd = All || cmd = Members then
             let getDiffsBetweenCommits = MemberAnalysis.getDiffsBetweenCommits git file
