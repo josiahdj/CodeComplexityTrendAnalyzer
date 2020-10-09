@@ -87,8 +87,9 @@ module MemberAnalysis =
                     try
                         match mem.Type with 
                         | Property -> 
-                            let p = ast.GetRoot().DescendantNodes().OfType<PropertyDeclarationSyntax>().First(fun x -> x.Identifier.Text = mem.Name)
-                            p.ToString() |> Strings.splitLines |> Some
+                            let p = ast.GetRoot().DescendantNodes().OfType<PropertyDeclarationSyntax>() |> Seq.tryFind (fun x -> x.Identifier.Text = mem.Name)
+                            p 
+                            |> Option.map ((fun x -> x.ToString()) >> Strings.splitLines)
                         | Method ->
                             let ms = ast.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Where(fun x -> x.Identifier.Text = mem.Name)
                             if ms.Any() then
@@ -98,7 +99,9 @@ module MemberAnalysis =
                                 | None -> 
                                     let meths = ms |> Seq.map (fun m -> m.ParameterList.Parameters.ToString()) |> String.concat "\r\n" 
                                     logger.Debug("Couldn't find Method {Identifier}{Parameters}. Hoping for single method (no overloads)... Options:\r\n{Constructors}", mem.Name, params', meths)
-                                    ms.Single().ToString() |> Strings.splitLines |> Some // bet that the signature was changed and that there's only one instance (if there are overrides, all bets are off)
+                                    ms 
+                                    |> Seq.tryExactlyOne 
+                                    |> Option.map ((fun s -> s.ToString()) >> Strings.splitLines) // bet that the signature was changed and that there's only one instance (if there are overrides, all bets are off)
                             else None
                         | Constructor ->
                             let cs = ast.GetRoot().DescendantNodes().OfType<ConstructorDeclarationSyntax>().Where(fun x -> x.Identifier.Text = mem.Name)
@@ -109,7 +112,9 @@ module MemberAnalysis =
                                 | None -> 
                                     let ctors = cs |> Seq.map (fun c -> c.ParameterList.Parameters.ToString()) |> String.concat "\r\n" 
                                     logger.Debug("Couldn't find Constructor {Identifier} ({Parameters}). Hoping for for single constructor (no overloads)... Options:\r\n{Constructors}", mem.Name, params', ctors)
-                                    cs.Single().ToString() |> Strings.splitLines |> Some // bet that the signature was changed and that there's only one instance (if there are overrides, all bets are off)
+                                    cs
+                                    |> Seq.tryExactlyOne 
+                                    |> Option.map ((fun s -> s.ToString()) >> Strings.splitLines) // bet that the signature was changed and that there's only one instance (if there are overrides, all bets are off)
                             else None
                     with 
                     | ex -> 
