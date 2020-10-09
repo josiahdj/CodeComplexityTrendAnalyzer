@@ -83,7 +83,7 @@ module MemberAnalysis =
             
             let getMemberStats (ast : SyntaxTree) (mem : MemberInfo) =
                 let lines = 
-                    let params' =  mem.Parameters |> Option.defaultValue String.Empty
+                    let params' = mem.Parameters |> Option.defaultValue String.Empty
                     try
                         match mem.Type with 
                         | Property -> 
@@ -97,7 +97,7 @@ module MemberAnalysis =
                                 | Some m' -> m'.ToString() |> Strings.splitLines |> Some
                                 | None -> 
                                     let meths = ms |> Seq.map (fun m -> m.ParameterList.Parameters.ToString()) |> String.concat "\r\n" 
-                                    logger.Debug("Couldn't find Method {Identifier}{Parameters}. Trying for single member. Options:\r\n{Constructors}", mem.Name, params', meths)
+                                    logger.Debug("Couldn't find Method {Identifier}{Parameters}. Hoping for single method (no overloads)... Options:\r\n{Constructors}", mem.Name, params', meths)
                                     ms.Single().ToString() |> Strings.splitLines |> Some // bet that the signature was changed and that there's only one instance (if there are overrides, all bets are off)
                             else None
                         | Constructor ->
@@ -108,12 +108,12 @@ module MemberAnalysis =
                                 | Some c' -> c'.ToString() |> Strings.splitLines |> Some
                                 | None -> 
                                     let ctors = cs |> Seq.map (fun c -> c.ParameterList.Parameters.ToString()) |> String.concat "\r\n" 
-                                    logger.Debug("Couldn't find Constructor {Identifier}{Parameters}. Trying for single member. Options:\r\n{Constructors}", mem.Name, params', ctors)
+                                    logger.Debug("Couldn't find Constructor {Identifier} ({Parameters}). Hoping for for single constructor (no overloads)... Options:\r\n{Constructors}", mem.Name, params', ctors)
                                     cs.Single().ToString() |> Strings.splitLines |> Some // bet that the signature was changed and that there's only one instance (if there are overrides, all bets are off)
                             else None
                     with 
                     | ex -> 
-                        logger.Error(ex, "Couldn't find the {MemberKind} {Identifier}{Parameters} in the AST", mem.Type, mem.Name, params')
+                        logger.Error(ex, "Couldn't find the {MemberKind} {Identifier} {Parameters} in the AST", mem.Type, mem.Name, params')
                         None
 
                 match lines with

@@ -68,19 +68,16 @@ type FileComplexity = {
 
 module ComplexityStats =
     let create (lines : string list) =
-        let values =
-            let lineComplexity (line : string) =
-                // count indentations as a proxy for complexity; see: 
-                // http://softwareprocess.es/static/WhiteSpace.html
-                // https://empear.com/blog/bumpy-road-code-complexity-in-context/
-                (Strings.countLeadingSpaces line)/4 + (Strings.countLeadingTabs line)
-            
-            let lineComplexities = 
-                lines
-                |> List.filter Strings.containsCode 
-                |> List.map lineComplexity
+        let lineComplexity (line : string) =
+            // count indentations as a proxy for complexity; see: 
+            // http://softwareprocess.es/static/WhiteSpace.html
+            // https://empear.com/blog/bumpy-road-code-complexity-in-context/
+            (Strings.countLeadingSpaces line)/4 + (Strings.countLeadingTabs line)
 
-            lineComplexities
+        let values =
+            lines
+            |> List.filter Strings.containsCode 
+            |> List.map lineComplexity
 
         let count = List.length values
         let total = List.sum values
@@ -122,11 +119,13 @@ type MemberRevision = { Commit: CommitInfo; Member: MemberInfo; LinesAdded: int;
                 this.LinesRemoved
 
 type CommitPair = { Previous: CommitInfo; Current: CommitInfo }
-    with 
-        static member ofTuple(prev, curr) = { Previous = prev; Current = curr }
-type CommitDiffs = CommitPair * FileRevision list
-type CodeToDiff = { Commit: CommitInfo; FileRevisions: FileRevision list; PreviousCode: string; CurrentCode: string }
+module CommitPair =
+    let ofTuple(prev, curr) = 
+        { Previous = prev; Current = curr }
 
+type CommitDiffs = CommitPair * FileRevision list
+
+type CodeToDiff = { Commit: CommitInfo; FileRevisions: FileRevision list; PreviousCode: string; CurrentCode: string }
 
 // CLI
 type CliCommand =
@@ -135,15 +134,15 @@ type CliCommand =
     | All
 type CliArguments = 
     | [<MainCommand; ExactlyOnce; First>] Command of command : CliCommand
-    | [<Mandatory; AltCommandLine("-r")>] Repository_Path of repo : string
-    | [<Mandatory; AltCommandLine("-s")>] Source_File of file : string
-    | [<AltCommandLine("-o")>] Output_File
+    | [<Mandatory; AltCommandLine("-r")>] RepositoryPath of repo : string
+    | [<Mandatory; AltCommandLine("-s")>] SourceFile of file : string
+    | [<AltCommandLine("-o")>] OutputFile
 with 
     interface IArgParserTemplate with
         member x.Usage =
             match x with
             | Command _ -> "Choose 'members' to return the member-level (constructors, methods, properties) file analysis; choose 'file' to return the file-level complexity growth analysis; choose 'all' to run both."
-            | Repository_Path _ -> "Specify a repository path, e.g. C:\repo_root_dir"
-            | Source_File _ -> "Specify a source file to be analyzed. The path is relalive to the repository directory, e.g. path/to/file.ext"
-            | Output_File _ -> "Output results to a file. The analysis files will be named after the source file. The binary's directory will be used."
+            | RepositoryPath _ -> "Specify a repository path, e.g. C:\repo_root_dir"
+            | SourceFile _ -> "Specify a source file to be analyzed. The path is relalive to the repository directory, e.g. path/to/file.ext"
+            | OutputFile _ -> "Output results to a file. The analysis files will be named after the source file. The binary's directory will be used."
 

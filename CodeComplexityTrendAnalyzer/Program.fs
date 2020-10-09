@@ -15,9 +15,9 @@ let main argv =
         let argResults = parser.Parse(argv)
     
         let cmd = argResults.GetResult Command
-        let repo = argResults.PostProcessResult (<@ Repository_Path @>, DirectoryInfo.ofPath)
-        let file = argResults.GetResult Source_File
-        let output = argResults.Contains Output_File
+        let repo = argResults.PostProcessResult (<@ RepositoryPath @>, DirectoryInfo.ofPath)
+        let file = argResults.GetResult SourceFile
+        let output = argResults.Contains OutputFile
                 
 
         let outputName n = 
@@ -45,8 +45,10 @@ let main argv =
 
 
         let git = Git.gitResult repo.FullName
-        let revs = file |> (Git.revs git >> List.map (ROP.tee Database.saveCommitInfo))
-
+        let revs = 
+            file 
+            |> (Git.revs git >> List.map (ROP.tee Database.saveCommitInfo))
+            
         if cmd = All || cmd = Members then
             let getDiffsBetweenCommits = MemberAnalysis.getDiffsBetweenCommits git file
             let getFilesForCommits = MemberAnalysis.getFilesForCommits git file 
@@ -61,7 +63,7 @@ let main argv =
             |> List.collect id
             |> (MemberAnalysis.asCsv >> writer (nameof MemberAnalysis))
 
-            printDone "MethodAnalysis"
+            printDone (nameof MemberAnalysis)
         
         if cmd = All || cmd = File then
             let getFileAtRev = Git.getFileAtRevMemoized git file
@@ -72,7 +74,7 @@ let main argv =
                          >> ROP.tee Database.toTable)
             |> (FileComplexityAnalysis.asCsv >> writer (nameof FileComplexityAnalysis))
 
-            printDone "FileComplexity"
+            printDone (nameof FileComplexityAnalysis)
 
 
         0 // return an integer exit code

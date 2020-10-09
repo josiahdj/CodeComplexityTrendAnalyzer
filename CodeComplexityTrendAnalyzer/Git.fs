@@ -8,19 +8,22 @@ module Git =
     open Fake.Core
     open Logging
 
-    let gitResult repoPath = 
-        CommandHelper.getGitResult repoPath
+    /// Gets a list of results given a git repository and a git command
+    let gitResult repoPath cmd = 
+        CommandHelper.getGitResult repoPath cmd
 
     let parseRev commit =
         let parts = String.splitStr "--" commit
         { Hash = parts.[0]; Date = parts.[1]; Author = parts.[2] }
     
+    /// Gets all revisions of a file from Git repository
     let revs git filePath = 
         let gitCmd = sprintf "log --date=short --pretty=format:%%h--%%ad--%%an %s" filePath
         git gitCmd 
         |> List.map parseRev
         |> List.rev
 
+    /// Gets the source of a file at a given revision (hash) from a repository
     let getFileAtRev git file (commit : CommitInfo) : CommitInfo * string list =
         let theFile = String.replace "\\" "/" file
         let gitCmd = sprintf "show %s:%s" commit.Hash theFile
@@ -29,6 +32,7 @@ module Git =
 
     let getFileAtRevMemoized git file = Caching.memoize (getFileAtRev git file)
 
+    /// Gets the difference between two revisions of a file in the Unified Diff format, from a git repository
     let unifiedDiff git revBefore revAfter theFile = 
         let gitCmd = sprintf "diff %s..%s --unified=0 -- %s" revBefore revAfter theFile
         git gitCmd 
@@ -89,6 +93,7 @@ module Git =
                 else
                     UnchangedLine s
 
+    /// Gets a structured list of File Revisions between two revisions of a file
     let getFileChangesBetweenCommits git file (revBefore : CommitInfo) (revAfter : CommitInfo) =
         logger.Information("Parsing Hunks from {File}, Rev {RevBefore} to Rev {RevAfter} =========================================", file, revBefore.Hash, revAfter.Hash)
         let toHunks lines =

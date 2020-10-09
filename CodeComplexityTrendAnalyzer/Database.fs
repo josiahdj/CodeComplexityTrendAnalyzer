@@ -5,20 +5,20 @@ open System.Data.SqlClient
 open System
 
 module Database = 
-    let [<Literal>] dbVendor = Common.DatabaseProviderTypes.MSSQLSERVER
-    let [<Literal>] connString = "Server=localhost;Database=CodeAnalysis;Integrated Security=True;"
-    let [<Literal>] indivAmount = 1000
-    let [<Literal>] useOptTypes  = true
-    let [<Literal>] contextSchemaPath = __SOURCE_DIRECTORY__ + @".\Schema.json" // ,ContextSchemaPath = contextSchemaPath
+    let [<Literal>] DbVendor = Common.DatabaseProviderTypes.MSSQLSERVER
+    let [<Literal>] ConnString = "Server=localhost;Database=CodeAnalysis;Integrated Security=True;"
+    let [<Literal>] IndivAmount = 1000
+    let [<Literal>] UseOptTypes  = true
+    let [<Literal>] ContextSchemaPath = __SOURCE_DIRECTORY__ + @".\Schema.json" // ,ContextSchemaPath = contextSchemaPath
     
-    type sql =
+    type Sql =
         SqlDataProvider<
-            dbVendor,
-            connString,
-            IndividualsAmount = indivAmount,
-            UseOptionTypes = useOptTypes>
+            DbVendor,
+            ConnString,
+            IndividualsAmount = IndivAmount,
+            UseOptionTypes = UseOptTypes>
     
-    let ctx = sql.GetDataContext()
+    let ctx = Sql.GetDataContext()
     // ctx.SaveContextSchema() |> ignore
     let commitInfo = ctx.Dbo.CommitInfo
 
@@ -27,13 +27,14 @@ module Database =
         ()
 
     let saveCommitInfo (ci : CommitInfo) =
-        let (success, date) = DateTime.TryParse(ci.Date)
-        if success then
-            try 
-                let newCi = commitInfo.``Create(Author, Date, Hash)``(ci.Author, date, ci.Hash)
-                ctx.SubmitUpdates()
-                logger.Debug("Created commit record with hash {Hash} and Id {Id}", newCi.Hash, newCi.Id)
-            with 
-            | :? SqlException as ex when ex.Message.Contains("unique") -> 
-                logger.Debug("The commit with hash {Hash} already exists.", ci.Hash)
+        //match DateTime.TryParse(ci.Date) with
+        //| true, date ->
+        //    try 
+        //        let newCi = commitInfo.``Create(Author, Date, Hash)``(ci.Author, date, ci.Hash)
+        //        ctx.SubmitUpdates()
+        //        logger.Debug("Created commit record with hash {Hash} and Id {Id}", newCi.Hash, newCi.Id)
+        //    with 
+        //    | :? SqlException as ex when ex.Message.Contains("unique") -> 
+        //        logger.Debug("The commit with hash {Hash} already exists.", ci.Hash)
+        //| false, _ -> ()
         ()
