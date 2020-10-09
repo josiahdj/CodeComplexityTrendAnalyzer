@@ -14,7 +14,8 @@ module Git =
 
     let parseRev commit =
         let parts = String.splitStr "--" commit
-        { Hash = parts.[0]; Date = parts.[1]; Author = parts.[2] }
+        let dateMaybe = DateTime.tryParse(parts.[1])
+        { Hash = parts.[0]; Date = dateMaybe; Author = parts.[2] }
     
     /// Gets all revisions of a file from Git repository
     let revs git filePath = 

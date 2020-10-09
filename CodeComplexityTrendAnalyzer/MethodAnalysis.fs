@@ -23,7 +23,7 @@ module MemberAnalysis =
         { Commit = commitPair.Current; FileRevisions = diffs; PreviousCode = prevCode; CurrentCode = currCode }
 
     let getMemberChangeData (revs : CodeToDiff) =
-        let distinctMemberInfos (ms : MemberInfo list) = ms |> List.distinctBy (fun m -> sprintf "%s-%s" (m.Type.ToString()) m.Name)
+        let distinctMemberInfos (ms : CompleteMemberInfo list) = ms |> List.distinctBy (fun m -> sprintf "%s-%s" (m.Type.ToString()) m.Name)
         let parameters (pl : ParameterListSyntax) = pl.Parameters.ToList() |> Seq.map (fun p -> p.ToString()) |> Seq.sort |> String.concat ","
 
         let getMemberInfos (prevAst : SyntaxTree) (currAst : SyntaxTree)  (diff : FileRevision) =
@@ -34,15 +34,15 @@ module MemberAnalysis =
                         match n with 
                         | :? PropertyDeclarationSyntax as p -> 
                             logger.Debug("Property: @{Identifier}", p.Identifier)
-                            Some { Name = p.Identifier.ToString(); Type = Property; Parameters = None; LineCount = 0; Complexity = None; }
+                            Some { Name = p.Identifier.ToString(); Type = Property; Parameters = None }
                         | :? MethodDeclarationSyntax as m -> 
                             let ps = parameters m.ParameterList
                             logger.Debug("Method: @{Identifier}, Parameters: {Parameters}", m.Identifier, ps)
-                            Some { Name = m.Identifier.ToString(); Type = Method; Parameters = Some ps; LineCount = 0; Complexity = None; }
+                            Some { Name = m.Identifier.ToString(); Type = Method; Parameters = Some ps }
                         | :? ConstructorDeclarationSyntax as c -> 
                             let ps = parameters c.ParameterList
                             logger.Debug("Constructor: @{Identifier}, Parameters: {Parameters}", c.Identifier, ps)
-                            Some { Name = c.Identifier.ToString(); Type = Constructor; Parameters = Some ps; LineCount = 0; Complexity = None; }
+                            Some { Name = c.Identifier.ToString(); Type = Constructor; Parameters = Some ps }
                         | _ -> 
                             logger.Warning("This member declaration syntax should have been prevented: {MemberKind}", n.Kind())
                             None // should (can) be prevented by the Where predicate
@@ -81,57 +81,21 @@ module MemberAnalysis =
                             | Some mi -> Set.add mi (getMemberInfos' ms rest)
                             | _ -> getMemberInfos' ms rest
             
-            let getMemberStats (ast : SyntaxTree) (mem : MemberInfo) =
-                let lines = 
-                    let params' = mem.Parameters |> Option.defaultValue String.Empty
-                    try
-                        match mem.Type with 
-                        | Property -> 
-                            let p = ast.GetRoot().DescendantNodes().OfType<PropertyDeclarationSyntax>() |> Seq.tryFind (fun x -> x.Identifier.Text = mem.Name)
-                            p 
-                            |> Option.map ((fun x -> x.ToString()) >> Strings.splitLines)
-                        | Method ->
-                            let ms = ast.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Where(fun x -> x.Identifier.Text = mem.Name)
-                            if ms.Any() then
-                                let m = ms |> Seq.tryFind (fun x -> (parameters x.ParameterList) = params')
-                                match m with
-                                | Some m' -> m'.ToString() |> Strings.splitLines |> Some
-                                | None -> 
-                                    let meths = ms |> Seq.map (fun m -> m.ParameterList.Parameters.ToString()) |> String.concat "\r\n" 
-                                    logger.Debug("Couldn't find Method {Identifier}{Parameters}. Hoping for single method (no overloads)... Options:\r\n{Constructors}", mem.Name, params', meths)
-                                    ms 
-                                    |> Seq.tryExactlyOne 
-                                    |> Option.map ((fun s -> s.ToString()) >> Strings.splitLines) // bet that the signature was changed and that there's only one instance (if there are overrides, all bets are off)
-                            else None
-                        | Constructor ->
-                            let cs = ast.GetRoot().DescendantNodes().OfType<ConstructorDeclarationSyntax>().Where(fun x -> x.Identifier.Text = mem.Name)
-                            if cs.Any() then
-                                let c = cs |> Seq.tryFind (fun x -> (parameters x.ParameterList) = params')
-                                match c with
-                                | Some c' -> c'.ToString() |> Strings.splitLines |> Some
-                                | None -> 
-                                    let ctors = cs |> Seq.map (fun c -> c.ParameterList.Parameters.ToString()) |> String.concat "\r\n" 
-                                    logger.Debug("Couldn't find Constructor {Identifier} ({Parameters}). Hoping for for single constructor (no overloads)... Options:\r\n{Constructors}", mem.Name, params', ctors)
-                                    cs
-                                    |> Seq.tryExactlyOne 
-                                    |> Option.map ((fun s -> s.ToString()) >> Strings.splitLines) // bet that the signature was changed and that there's only one instance (if there are overrides, all bets are off)
-                            else None
-                    with 
-                    | ex -> 
-                        logger.Error(ex, "Couldn't find the {MemberKind} {Identifier} {Parameters} in the AST", mem.Type, mem.Name, params')
-                        None
-
+            let getMemberStats (ast: SyntaxTree) (mem: InitialMemberInfo) =
+                let lines = mem.ToLinesOfCode(ast)
                 match lines with
-                | Some ls ->
-                    let stats = ls |> ComplexityStats.create |> Some
-                    { mem with Complexity = stats; LineCount = ls.Length }
-                | _ -> mem
+                | Ok ls ->
+                    let stats = ls |> ComplexityStats.create |> Ok
+                    { Name = mem.Name; Type = mem.Type; Parameters = mem.Parameters; Complexity = stats; LineCount = Some ls.Length }
+                | Error err -> 
+                    { Name = mem.Name; Type = mem.Type; Parameters = mem.Parameters; Complexity = Error err; LineCount = None }
 
             let ms = 
-                let mis = getMemberInfos' Set.empty diff.DiffHunk.LineChanges |> Set.toList
-                let misWithStats = List.map (getMemberStats currAst) mis |> List.filter (fun m -> m.Complexity.IsSome)
-                misWithStats
-
+                getMemberInfos' Set.empty diff.DiffHunk.LineChanges 
+                |> Set.toList
+                |> List.map (getMemberStats currAst) 
+                // |> List.filter (fun m -> Result.isOk m.Complexity)
+                
             diff, ms
 
         let getMemberRevisions (toDiff : CodeToDiff) =
@@ -147,11 +111,10 @@ module MemberAnalysis =
             let toRevisionInfos (d, ms) = 
                 ms 
                 |> distinctMemberInfos 
-                |> List.map (fun m -> { Commit = rev; Member = m; LinesAdded = d.DiffHunk.LinesAdded; LinesRemoved = d.DiffHunk.LinesRemoved })
+                |> List.map (fun ms' -> { Commit = rev; Member = ms'; LinesAdded = d.DiffHunk.LinesAdded; LinesRemoved = d.DiffHunk.LinesRemoved })
 
             diffs 
-            |> List.map (getMemberInfos' >> toRevisionInfos)
-            |> List.collect id
+            |> List.collect (getMemberInfos' >> toRevisionInfos)
             |> tee (fun ms -> logger.Information("Found {MemberCount} members in Revision {Revision} by {Author} on {Date}", ms.Length, rev.Hash, rev.Author, rev.Date))
         
         revs

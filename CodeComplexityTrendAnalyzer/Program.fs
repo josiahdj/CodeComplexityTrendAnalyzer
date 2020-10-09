@@ -18,7 +18,7 @@ let main argv =
         let repo = argResults.PostProcessResult (<@ RepositoryPath @>, DirectoryInfo.ofPath)
         let file = argResults.GetResult SourceFile
         let output = argResults.Contains OutputFile
-                
+        let startDate = argResults.TryPostProcessResult (<@ StartDate @>, DateTime.tryParseOrDefault DateTime.MinValue) |> Option.defaultValue DateTime.MinValue
 
         let outputName n = 
             if output then
@@ -47,14 +47,16 @@ let main argv =
         let git = Git.gitResult repo.FullName
         let revs = 
             file 
-            |> (Git.revs git >> List.map (ROP.tee Database.saveCommitInfo))
+            |> Git.revs git 
+            |> List.filter (fun c -> c.Date |> Option.map (fun dt -> dt.Date >= startDate.Date) |> Option.defaultValue false)
+            |> List.map (ROP.tee Database.saveCommitInfo)
             
         if cmd = All || cmd = Members then
             let getDiffsBetweenCommits = MemberAnalysis.getDiffsBetweenCommits git file
             let getFilesForCommits = MemberAnalysis.getFilesForCommits git file 
 
             revs
-            |> List.pairwise // NOTE, unless there is some caching, this will do double the work unnecessarily
+            |> List.pairwise // NOTE, unless there is some caching, this will do ~double the work unnecessarily
             |> List.map (CommitPair.ofTuple 
                          >> getDiffsBetweenCommits 
                          >> getFilesForCommits 
