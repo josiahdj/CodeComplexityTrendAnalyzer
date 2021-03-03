@@ -20,6 +20,8 @@ let main argv =
         let output = argResults.Contains OutputFile
         let startDate = argResults.TryPostProcessResult (<@ StartDate @>, DateTime.tryParseOrDefault DateTime.MinValue) |> Option.defaultValue DateTime.MinValue
 
+        use database = new Database(Database.InMemoryConnectionString)
+
         let outputName n = 
             if output then
                 let fileInfo = FileInfo.ofPath file
@@ -49,7 +51,7 @@ let main argv =
             file 
             |> Git.revs git 
             |> List.filter (fun c -> c.Date |> Option.map (fun dt -> dt.Date >= startDate.Date) |> Option.defaultValue false)
-            |> List.map (ROP.tee Database.saveCommitInfo)
+            |> List.map (ROP.tee database.saveCommitInfo)
             
         if cmd = All || cmd = Members then
             let getDiffsBetweenCommits = MemberAnalysis.getDiffsBetweenCommits git file
@@ -61,7 +63,7 @@ let main argv =
                          >> getDiffsBetweenCommits 
                          >> getFilesForCommits 
                          >> MemberAnalysis.getMemberChangeData 
-                         >> List.map (ROP.tee Database.toTable))
+                         >> List.map (ROP.tee database.toTable))
             |> List.collect id
             |> (MemberAnalysis.asCsv >> writer (nameof MemberAnalysis))
 
@@ -73,7 +75,7 @@ let main argv =
             revs
             |> List.map (getFileAtRev
                          >> FileComplexityAnalysis.toFileComplexity
-                         >> ROP.tee Database.toTable)
+                         >> ROP.tee database.toTable)
             |> (FileComplexityAnalysis.asCsv >> writer (nameof FileComplexityAnalysis))
 
             printDone (nameof FileComplexityAnalysis)

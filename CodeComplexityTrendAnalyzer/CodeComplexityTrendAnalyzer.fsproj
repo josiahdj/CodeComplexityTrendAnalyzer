@@ -2,8 +2,8 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
-    <LangVersion>preview</LangVersion>
+    <TargetFramework>net5.0</TargetFramework>
+    <DotnetFscCompilerPath></DotnetFscCompilerPath>
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,29 +21,33 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Argu" Version="6.0.0" />
-    <PackageReference Include="Fake.Tools.Git" Version="5.19.1" />
-    <PackageReference Include="FSharp.Collections.ParallelSeq" Version="1.1.2" />
-    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.0.0" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="3.5.0" />
+    <PackageReference Include="Argu" Version="6.1.1" />
+    <PackageReference Include="Dapper" Version="2.0.78" />
+    <PackageReference Include="Fake.Tools.Git" Version="5.20.3" />
+    <PackageReference Include="FSharp.Collections.ParallelSeq" Version="1.1.4" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.2" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="3.8.0" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="5.0.3" />
+    <PackageReference Include="npgsql" Version="5.0.3" />
     <PackageReference Include="Serilog.Sinks.Console" Version="3.1.1" />
     <PackageReference Include="Serilog.Sinks.File" Version="4.1.0" />
     <PackageReference Include="Serilog.Sinks.Literate" Version="3.0.0" />
     <PackageReference Include="Serilog.Sinks.RollingFile" Version="3.3.0" />
-    <PackageReference Include="SQLProvider" Version="1.1.84" />
-    <PackageReference Include="System.Data.SqlClient" Version="4.8.1" />
+    <PackageReference Include="FSharp.Data" Version="3.3.3" />
   </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Update="FSharp.Core" Version="4.7.1" />
-  </ItemGroup>
+    <ItemGroup>
+        <Reference Include="FSharp.Data.SqlProvider">
+            <HintPath>compiletime/FSharp.Data.SqlProvider.dll</HintPath>
+        </Reference>
+    </ItemGroup>
+    <ItemGroup>
+      <PackageReference Update="FSharp.Core" Version="5.0.1" />
+    </ItemGroup>
+    <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
+        <Exec Command="xcopy %USERPROFILE%\.nuget\packages\SQLProvider\1.1.98\lib\net451\FSharp.Data.SqlProvider.dll compiletime\ /y" />
+    </Target>
+    <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+        <Exec Command="xcopy %USERPROFILE%\.nuget\packages\SQLProvider\1.1.98\lib\netstandard2.0\FSharp.Data.SqlProvider.dll bin\Debug\net5.0\ /y" />
+    </Target>
   
-  <PropertyGroup>
-    <IsWindows Condition="'$(OS)' == 'Windows_NT'">true</IsWindows>
-  </PropertyGroup>
-  <!-- RUN: "nuget install System.Data.SqlClient -Version 4.8.1 -OutputDirectory ./packages -Framework NETCoreApp3.1 -ExcludeVersion" in project (this) folder -->
-  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="copy .\packages\System.Data.SqlClient\runtimes\win\lib\netcoreapp2.1\System.Data.SqlClient.dll bin\Debug\netcoreapp3.1\" Condition="'$(IsWindows)' == 'true'" />
-    <Exec Command="cp ./packages/System.Data.SqlClient/runtimes/unix/lib/netcoreapp2.1/System.Data.SqlClient.dll bin/Debug/netcoreapp3.1/" Condition="'$(IsWindows)' != 'true'" />
-  </Target>
 </Project>
