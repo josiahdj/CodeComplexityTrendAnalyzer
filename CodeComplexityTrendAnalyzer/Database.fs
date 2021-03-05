@@ -1,15 +1,24 @@
 ﻿namespace CodeComplexityTrendAnalyzer
 
 open System
-open System.Data.Common
+open System.Collections.Generic
 open Dapper
 open Microsoft.Data.Sqlite
+open System.Linq
 
 [<Sealed>]
 type Database (connectionString:string) = 
+
+    //https://github.com/dotnet/docs/tree/master/samples/snippets/standard/data/sqlite
     let connection = new SqliteConnection(connectionString)
     let tableExists tableName =
         1 = connection.QuerySingle<int>($"SELECT count(*) FROM sqlite_master WHERE type='table' AND name='{tableName}'")
+        
+    let dateTimeToISOString (dateTime: DateTime) =
+        dateTime.ToString("o", System.Globalization.CultureInfo.InvariantCulture)
+
+    let tryISOStringToDateTime (input: string) =
+        DateTime.tryParse input
 
     do connection.Open()
        if not (tableExists "FileComplexity") then
@@ -43,34 +52,39 @@ type Database (connectionString:string) =
        if not (tableExists "CommitInfo") then
            connection.Execute("""CREATE TABLE [CommitInfo] (
                                     [Hash]   TEXT NOT NULL PRIMARY KEY,
-                                    [Date]   TEX  NOT NULL,
+                                    [Date]   TEXT  NOT NULL,
                                     [Author] NVARCHAR (255) NOT NULL  
                                  )""") |> ignore
 
-    static member InMemoryConnectionString = "Data Source=InMemorySample;Mode=Memory;Cache=Shared";
-    
-    member _.dateTimeToISOString (dateTime: DateTime) =
-        dateTime.ToString("o", System.Globalization.CultureInfo.InvariantCulture)
-
-    member _.insertCommitInfo hash date author =
+    let insertCommitInfo hash date author =
         connection.Execute(
             """Insert into [CommitInfo] ([Hash], [Date], [Author]) Values(@Hash, @Date, @Author)""",
             {| Hash = hash; Date = date; Author = author |}
             ) |> ignore
 
+    static member InMemoryConnectionString = "Data Source=InMemorySample;Mode=Memory;Cache=Shared";
+    
     member _.toTable data =
         ()
 
-    member this.saveCommitInfo (ci : CommitInfo) =
+    member _.saveCommitInfo (ci : CommitInfo) =
         match ci.Date with
         | Some date ->
             try 
-                this.insertCommitInfo ci.Hash date ci.Author
+                insertCommitInfo ci.Hash (dateTimeToISOString date) ci.Author
                 logger.Debug($"Created commit record with hash {ci.Hash}")
             with ex -> 
                 logger.Debug(ex.Message)
                 logger.Debug("The commit with hash {Hash} already exists.", ci.Hash)
         | None -> ()
+
+    member _.getCommitInfo (hash: string) =
+        match connection.Query("SELECT [Hash], [Date], [Author] from [CommitInfo] where [Hash] = @hash", {| hash = hash |}).ToArray() with
+        | [| result |] -> 
+            let result = result :?> IDictionary<string, obj>
+            Some { Hash = result.["Hash"] :?> string; Date = tryISOStringToDateTime (result.["Date"]:?> string); Author = result.["Author"]:?> string }
+        | _ -> None
+        
 
     interface IDisposable with 
         member _.Dispose() = connection.Close()

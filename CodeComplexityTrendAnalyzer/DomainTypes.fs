@@ -7,6 +7,7 @@ open Microsoft.CodeAnalysis.CSharp.Syntax
 open System
 
 // Git
+[<CLIMutable>]
 type CommitInfo =
     { Hash: string
       Date: DateTime option
