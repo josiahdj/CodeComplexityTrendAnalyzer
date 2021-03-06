@@ -113,29 +113,23 @@ module Git =
                 let parseLine line' =
                     match line' with
                     | LineInfo li -> 
-                            logger.Debug("LineInfo: @{LineInfo}", li)
-                            toHunks' (li::hunks) 0
+                        logger.Debug("LineInfo: @{LineInfo}", li)
+                        toHunks' (li::hunks) 0
                     | LineChange lc -> 
                         match hunks with
                         | [] -> 
                             failwith "this shouldn't really happen!"
-                        | [curr] ->
-                            let l = lineNum + 1
-                            logger.Debug("Hunk #{HunkNumber}, LineChange {LineNumber} ({Operation}): {Line}", hunks.Length, lc.Operation, l, lc.Text)
-                            let newCurr = updateDiffHunk curr lc [] l
-                            toHunks' newCurr l
                         | curr::tail ->
-                            let l = lineNum + 1
+                            let l = lineNum + if lc.Operation = LineChangeOperation.AddLine then 1 else 0
                             logger.Debug("Hunk #{HunkNumber}, LineChange {LineNumber} ({Operation}): {Line}", hunks.Length, lc.Operation, l, lc.Text)
                             let newCurr = updateDiffHunk curr lc tail l
                             toHunks' newCurr l
                     | DiffHeader dh -> 
-                            logger.Debug("DiffHeader {DiffHeader}", dh)
-                            toHunks' hunks 0
+                        logger.Debug("DiffHeader {DiffHeader}", dh)
+                        toHunks' hunks 0
                     | UnchangedLine ul -> 
-                            let l = lineNum + 1
-                            logger.Debug("Hunk #{HunkNumber}, UnchangedLine {LineNumber}: {Line}", hunks.Length, l, ul)
-                            toHunks' hunks l
+                        logger.Debug("Hunk #{HunkNumber}, UnchangedLine {LineNumber}: {Line}", hunks.Length, lineNum, ul)
+                        toHunks' hunks lineNum
 
                 match lines' with
                 | [] -> hunks // The End

@@ -47,7 +47,7 @@ module MemberAnalysis =
             let tryGetMemberInfo (ast: SyntaxTree) lineNumber =
                 let lines = ast.GetText().Lines
 
-                if lineNumber < lines.Count then
+                if lineNumber <= lines.Count then
                     let toMemberInfo (n: MemberDeclarationSyntax) =
                         match n with
                         | :? PropertyDeclarationSyntax as p ->
@@ -81,7 +81,7 @@ module MemberAnalysis =
 
                             None // should (can) be prevented by the Where predicate
 
-                    let span = lines.[lineNumber].Span
+                    let span = lines.[lineNumber-1].Span
 
                     let members =
                         ast
