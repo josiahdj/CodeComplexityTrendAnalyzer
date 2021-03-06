@@ -3,10 +3,10 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net5.0</TargetFramework>
-    <DotnetFscCompilerPath></DotnetFscCompilerPath>
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="CommandLineParameters.fs" />
     <Compile Include="Strings.fs" />
     <Compile Include="Result.fs" />
     <Compile Include="ROP.fs" />
@@ -17,7 +17,7 @@
     <Compile Include="Git.fs" />
     <Compile Include="FileComplexityAnalysis.fs" />
     <Compile Include="MethodAnalysis.fs" />
-    <Compile Include="Program.fs" />
+    <Compile Include="CodeComplexityTrendAnalyzer.fs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -28,7 +28,6 @@
     <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.2" PrivateAssets="all" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="3.8.0" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="5.0.3" />
-    <PackageReference Include="npgsql" Version="5.0.3" />
     <PackageReference Include="Serilog.Sinks.Console" Version="3.1.1" />
     <PackageReference Include="Serilog.Sinks.File" Version="4.1.0" />
     <PackageReference Include="Serilog.Sinks.Literate" Version="3.0.0" />
@@ -36,18 +35,6 @@
     <PackageReference Include="FSharp.Data" Version="3.3.3" />
   </ItemGroup>
     <ItemGroup>
-        <Reference Include="FSharp.Data.SqlProvider">
-            <HintPath>compiletime/FSharp.Data.SqlProvider.dll</HintPath>
-        </Reference>
-    </ItemGroup>
-    <ItemGroup>
       <PackageReference Update="FSharp.Core" Version="5.0.1" />
-    </ItemGroup>
-    <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
-        <Exec Command="xcopy %USERPROFILE%\.nuget\packages\SQLProvider\1.1.98\lib\net451\FSharp.Data.SqlProvider.dll compiletime\ /y" />
-    </Target>
-    <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-        <Exec Command="xcopy %USERPROFILE%\.nuget\packages\SQLProvider\1.1.98\lib\netstandard2.0\FSharp.Data.SqlProvider.dll bin\Debug\net5.0\ /y" />
-    </Target>
-  
+    </ItemGroup>  
 </Project>

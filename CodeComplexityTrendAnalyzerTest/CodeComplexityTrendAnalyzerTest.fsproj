@@ -22,4 +22,8 @@
     <ProjectReference Include="..\CodeComplexityTrendAnalyzer\CodeComplexityTrendAnalyzer.fsproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Update="FSharp.Core" Version="5.0.1" />
+  </ItemGroup>
+
 </Project>

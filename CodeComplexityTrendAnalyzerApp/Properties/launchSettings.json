@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "CodeComplexityTrendAnalyzerApp": {
+      "commandName": "Project",
+      "commandLineArgs": "members --repositorypath C:\\code\\FsXaml -s src\\FsXaml.Wpf\\Utilities.fs -o -d \"4/9/2010\""
+    }
+  }
+}

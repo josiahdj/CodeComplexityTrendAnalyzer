@@ -52,8 +52,8 @@ type Database (connectionString:string) =
        if not (tableExists "CommitInfo") then
            connection.Execute("""CREATE TABLE [CommitInfo] (
                                     [Hash]   TEXT NOT NULL PRIMARY KEY,
-                                    [Date]   TEXT  NOT NULL,
-                                    [Author] NVARCHAR (255) NOT NULL  
+                                    [Date]   TEXT NOT NULL,
+                                    [Author] TEXT NOT NULL  
                                  )""") |> ignore
 
     let insertCommitInfo hash date author =
