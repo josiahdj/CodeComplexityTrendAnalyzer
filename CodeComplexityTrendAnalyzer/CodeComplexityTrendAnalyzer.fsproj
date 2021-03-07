@@ -1,11 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
+    <OutputType>Library</OutputType>
     <TargetFramework>net5.0</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Regex.fs" />
     <Compile Include="CommandLineParameters.fs" />
     <Compile Include="Strings.fs" />
     <Compile Include="Result.fs" />

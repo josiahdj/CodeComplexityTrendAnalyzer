@@ -9,15 +9,6 @@ module Program =
     open CodeComplexityTrendAnalyzer
     open CommandLineParameters
 
-    type ApplicationArguments =
-        {
-            Cmd: CliCommand
-            RepoPath:DirectoryInfo
-            File: string
-            Output: bool
-            StartDate: DateTime
-        }
-
     type OutputTarget =
     | FileInfo of FileInfo
     | Console of StepName:string

@@ -1,6 +1,8 @@
 ﻿module CommandLineParameters
 
 open Argu
+open System
+open System.IO
 
 type CliCommand =
     | Members
@@ -24,3 +26,12 @@ type CliArguments =
             | OutputFile _ ->
                 "Output results to a file. The analysis files will be named after the source file. The binary's directory will be used."
             | StartDate _ -> "Date after which to analyze"
+
+type ApplicationArguments =
+    {
+        Cmd: CliCommand
+        RepoPath:DirectoryInfo
+        File: string
+        Output: bool
+        StartDate: DateTime
+    }

@@ -9,8 +9,7 @@ module Git =
     open Logging
 
     /// Gets a list of results given a git repository and a git command
-    let gitResult repoPath cmd = 
-        CommandHelper.getGitResult repoPath cmd
+    let gitResult = CommandHelper.getGitResult 
 
     let parseRev commit =
         let parts = String.splitStr "--" commit
@@ -38,12 +37,6 @@ module Git =
         let gitCmd = sprintf "diff %s..%s --unified=0 -- %s" revBefore revAfter theFile
         git gitCmd 
 
-    let private lineInfoRegex = Regex("@@ -(?<before_line>[0-9]+)(,(?<before_line_count>[0-9]+))? \+(?<after_line>[0-9]+)(,(?<after_line_count>[0-9]+))?( @@) ?(?<member>.*?)$", RegexOptions.Compiled)
-    let private isLineInfo s =
-        let matches = lineInfoRegex.Match(s)
-        let isMatch = matches.Success && matches.Groups.Count > 0
-        (isMatch, matches.Groups)
-
     let private groupValue (name : string) (grps : GroupCollection) =
         if grps.[name].Success then
             Some grps.[name].Value
@@ -65,34 +58,23 @@ module Git =
           LineChanges = []
           LinesAdded = 0
           LinesRemoved = 0}
-
+    
+    let private lineInfoRegex = Regex("@@ -(?<before_line>[0-9]+)(,(?<before_line_count>[0-9]+))? \+(?<after_line>[0-9]+)(,(?<after_line_count>[0-9]+))?( @@) ?(?<member>.*?)$", RegexOptions.Compiled)
+    let private diffHeaderRegex = Regex("^(diff|index|---|\+\+\+) ", RegexOptions.Compiled)
     let private lineChangeRegex = Regex("^(?<op>\+|\-)(?<line>[^+-].*?)$", RegexOptions.Compiled) // unfortunately (or fortunately) eliminates add/remove of empty lines
-    let private isLineChange s =
-        let matches = lineChangeRegex.Match(s)
-        let isMatch = matches.Success && matches.Groups.Count > 0
-        (isMatch, matches.Groups)
 
     let private toLineChange grps =
         let op = grps |> groupValue "op" |> Option.map (fun s -> match s with | "+" -> AddLine | "-" -> RemoveLine | _ -> LeaveLine) |> Option.get
         let line = grps |> groupValue "line" |> Option.defaultValue String.Empty
         { Operation = op; LineNumber = 0; Text = line }
 
-    let private diffHeaderRegex = Regex("^(diff|index|---|\+\+\+) ", RegexOptions.Compiled)
-    let private isDiffHeader s = diffHeaderRegex.IsMatch s
-        
+    open Regex
     let private (|LineInfo|LineChange|DiffHeader|UnchangedLine|) s = 
-        let isInfo, grps = isLineInfo s
-        if isInfo then
-            LineInfo (toLineInfo grps)
-        else
-            let isChange, grps' = isLineChange s
-            if isChange then
-                LineChange (toLineChange grps')
-            else 
-                if isDiffHeader s then
-                    DiffHeader s
-                else
-                    UnchangedLine s
+        match s with
+        | FromRegex lineInfoRegex groups -> LineInfo(toLineInfo groups)
+        | FromRegex lineChangeRegex groups -> LineChange(toLineChange groups)
+        | FromRegex diffHeaderRegex _ -> DiffHeader s
+        | _ -> UnchangedLine s
 
     /// Gets a structured list of File Revisions between two revisions of a file
     let getFileChangesBetweenCommits git file (revBefore : CommitInfo) (revAfter : CommitInfo) =

@@ -1,8 +1,7 @@
 {
   "profiles": {
     "CodeComplexityTrendAnalyzer": {
-      "commandName": "Project",
-      "commandLineArgs": "members --repositorypath C:\\code\\platform-analysis\\ -s MoboLogic\\src\\Order.cs -o -d \"4/9/2020\""
+      "commandName": "Project"
     }
   }
 }
