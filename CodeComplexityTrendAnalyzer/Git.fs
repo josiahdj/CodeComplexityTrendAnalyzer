@@ -3,43 +3,59 @@
 [<RequireQualifiedAccess>]
 module Git = 
     open System
+    open System.IO
     open System.Text.RegularExpressions
     open Fake.Tools.Git
     open Fake.Core
     open Logging
+    open CodeComplexityTrendAnalyzer.DomainTypes
 
     /// Gets a list of results given a git repository and a git command
     let gitResult = CommandHelper.getGitResult 
 
     let parseRev commit =
         let parts = String.splitStr "--" commit
-        let dateMaybe = DateTime.tryParse(parts.[1])
-        { Hash = parts.[0]; Date = dateMaybe; Author = parts.[2] }
+        let dateMaybe = DateTime.tryParse(parts[1])
+        { Hash = parts[0]; Date = dateMaybe; Author = parts[2] }
     
     /// Gets all revisions of a file from Git repository
     let revs git filePath = 
-        let gitCmd = sprintf "log --date=short --pretty=format:%%h--%%ad--%%an %s" filePath
+        let gitCmd = $"log --follow --date=short --pretty=format:%%h--%%ad--%%an %s{filePath}"
         git gitCmd 
         |> List.map parseRev
         |> List.rev
-
+        
+    let filesChanged git (commit: CommitInfo) : string list =
+        let gitCmd = $"show --pretty=\"format:\" --name-only %s{commit.Hash}"
+        git gitCmd
+        
     /// Gets the source of a file at a given revision (hash) from a repository
-    let getFileAtRev git file (commit : CommitInfo) : CommitInfo * string list =
+    let rec getFileAtRev git file (commit : CommitInfo) : CommitInfo * string list =
         let theFile = String.replace "\\" "/" file
-        let gitCmd = sprintf "show %s:%s" commit.Hash theFile
-        let code = git gitCmd
+        let gitCmd = $"show %s{commit.Hash}:%s{theFile}"
+        let code =
+            match git gitCmd with
+            | [] ->
+                let filesChangedInCommit = filesChanged git commit
+                let fileName = Path.GetFileName(file)
+                filesChangedInCommit
+                |> List.tryFind (fun f -> f.EndsWith(fileName))
+                |> Option.map (fun f -> getFileAtRev git f commit)
+                |> Option.map snd 
+                |> Option.defaultValue []
+            | lines -> lines
         commit, code
 
     let getFileAtRevMemoized git file = Caching.memoize (getFileAtRev git file)
 
     /// Gets the difference between two revisions of a file in the Unified Diff format, from a git repository
     let unifiedDiff git revBefore revAfter theFile = 
-        let gitCmd = sprintf "diff %s..%s --unified=0 -- %s" revBefore revAfter theFile
+        let gitCmd = $"diff %s{revBefore}..%s{revAfter} --unified=0 -- %s{theFile}"
         git gitCmd 
 
     let private groupValue (name : string) (grps : GroupCollection) =
-        if grps.[name].Success then
-            Some grps.[name].Value
+        if grps[name].Success then
+            Some grps[name].Value
         else 
             None
 
@@ -80,7 +96,7 @@ module Git =
     let getFileChangesBetweenCommits git file (revBefore : CommitInfo) (revAfter : CommitInfo) =
         logger.Information("Parsing Hunks from {File}, Rev {RevBefore} to Rev {RevAfter} =========================================", file, revBefore.Hash, revAfter.Hash)
         let toHunks lines =
-            //dumpToFile (sprintf "%s-%s--%s.diff" file revBefore revAfter) lines
+            //dumpToFile $"%s{file}-%s{revBefore.Hash}--%s{revAfter.Hash}.diff" lines
             let rec toHunks' hunks lineNum lines' = 
                 let updateDiffHunk (dh : DiffHunk) chg dhs ln =
                     let added, removed = 

@@ -1,6 +1,8 @@
 ﻿namespace CodeComplexityTrendAnalyzer
 
 module FileComplexityAnalysis =
+    open CodeComplexityTrendAnalyzer.DomainTypes
+    
     let toFileComplexity (commit, code) =
         let complexity = ComplexityStats.create code
 

@@ -20,7 +20,7 @@ type CliArguments =
             match x with
             | Command _ ->
                 "Choose 'members' to return the member-level (constructors, methods, properties) file analysis; choose 'file' to return the file-level complexity growth analysis; choose 'all' to run both."
-            | RepositoryPath _ -> "Specify a repository path, e.g. C:\repo_root_dir"
+            | RepositoryPath _ -> "Specify a repository path, e.g. C:\\code"
             | SourceFile _ ->
                 "Specify a source file to be analyzed. The path is relalive to the repository directory, e.g. path/to/file.ext"
             | OutputFile _ ->

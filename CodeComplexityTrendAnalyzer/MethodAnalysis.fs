@@ -1,13 +1,13 @@
 namespace CodeComplexityTrendAnalyzer
 
 module MemberAnalysis =
-    open System
     open Microsoft.CodeAnalysis.CSharp
     open Microsoft.CodeAnalysis.Text
     open System.Linq
     open Microsoft.CodeAnalysis.CSharp.Syntax
     open Microsoft.CodeAnalysis
     open Fake.Core
+    open CodeComplexityTrendAnalyzer.DomainTypes
 
     let getDiffsBetweenCommits git file (commitPair: CommitPair): CommitDiffs =
         let diffs =
@@ -16,17 +16,17 @@ module MemberAnalysis =
         commitPair, diffs
 
     let getFilesForCommits git file (commitDiffs: CommitDiffs): CodeToDiff =
-        let (commitPair, diffs) = commitDiffs
+        let commitPair, diffs = commitDiffs
         let toLines (_, ls) = String.toLines ls
 
         let prevCode =
             Git.getFileAtRevMemoized git file commitPair.Previous
             |> toLines
-        //dumpToFile (sprintf "%s-Before-%s.cs" file revBefore.Hash) (Strings.splitLines codeBefore)
+        //dumpToFile $"%s{file}-Before-%s{commitPair.Previous.Hash}.cs" (Strings.splitLines prevCode)
         let currCode =
             Git.getFileAtRevMemoized git file commitPair.Current
             |> toLines
-        //dumpToFile (sprintf "%s-After-%s.cs" file revAfter.Hash) (Strings.splitLines codeAfter)
+        //dumpToFile $"%s{file}-After-%s{commitPair.Current.Hash}.cs" (Strings.splitLines currCode)
         { Commit = commitPair.Current
           FileRevisions = diffs
           PreviousCode = prevCode
@@ -35,7 +35,7 @@ module MemberAnalysis =
     let getMemberChangeData (revs: CodeToDiff) =
         let distinctMemberInfos (ms: CompleteMemberInfo list) =
             ms
-            |> List.distinctBy (fun m -> sprintf "%s-%s" (m.Type.ToString()) m.Name)
+            |> List.distinctBy (fun m -> $"%s{m.Type.ToString()}-%s{m.Name}")
 
         let parameters (pl: ParameterListSyntax) =
             pl.Parameters.ToList()
@@ -81,7 +81,7 @@ module MemberAnalysis =
 
                             None // should (can) be prevented by the Where predicate
 
-                    let span = lines.[lineNumber-1].Span
+                    let span = lines[lineNumber-1].Span
 
                     let members =
                         ast

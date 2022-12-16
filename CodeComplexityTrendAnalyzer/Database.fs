@@ -2,6 +2,7 @@
 
 open System
 open System.Collections.Generic
+open CodeComplexityTrendAnalyzer.DomainTypes
 open Dapper
 open Microsoft.Data.Sqlite
 open System.Linq
@@ -82,7 +83,7 @@ type Database (connectionString:string) =
         match connection.Query("SELECT [Hash], [Date], [Author] from [CommitInfo] where [Hash] = @hash", {| hash = hash |}).ToArray() with
         | [| result |] -> 
             let result = result :?> IDictionary<string, obj>
-            Some { Hash = result.["Hash"] :?> string; Date = tryISOStringToDateTime (result.["Date"]:?> string); Author = result.["Author"]:?> string }
+            Some { Hash = result["Hash"] :?> string; Date = tryISOStringToDateTime (result["Date"]:?> string); Author = result["Author"]:?> string }
         | _ -> None
         
 

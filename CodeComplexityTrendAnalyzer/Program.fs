@@ -7,6 +7,7 @@ module Program =
     open System
     open System.IO
     open CodeComplexityTrendAnalyzer
+    open CodeComplexityTrendAnalyzer.DomainTypes
     open CommandLineParameters
 
     type OutputTarget =
@@ -16,7 +17,7 @@ module Program =
     let getOutputTarget shouldWriteToFile filePath stepName = 
         if shouldWriteToFile then
             let fileInfo = FileInfo.ofPath filePath
-            let newFileInfo =  FileInfo.ofPath (fileInfo.Directory.FullName </> (sprintf "%s-%s.csv" stepName fileInfo.Name))
+            let newFileInfo =  FileInfo.ofPath (fileInfo.Directory.FullName </> $"%s{stepName}-%s{fileInfo.Name}.csv")
             FileInfo newFileInfo
         else 
             Console stepName
@@ -27,7 +28,7 @@ module Program =
             File.create fileInfo.FullName
         | Console _ -> ()
 
-    let run (arguments:ApplicationArguments) =
+    let run (arguments: ApplicationArguments) =
         use database = new Database(Database.InMemoryConnectionString)
 
         let outputWriter outputTarget resultRows =
@@ -37,7 +38,7 @@ module Program =
             let writeLine outputTarget resultRow =
                 match outputTarget with
                 | FileInfo fileInfo -> appendToFile fileInfo.FullName resultRow
-                | Console stepName -> Console.Out.WriteLine(sprintf "%s: %s" stepName resultRow)
+                | Console stepName -> Console.Out.WriteLine($"%s{stepName}: %s{resultRow}")
         
             resultRows |> Seq.iter (writeLine outputTarget)
 

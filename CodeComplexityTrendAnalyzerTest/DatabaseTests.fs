@@ -2,6 +2,7 @@ module CodeComplexityTrendAnalyzerTest
 
 open System
 open CodeComplexityTrendAnalyzer
+open CodeComplexityTrendAnalyzer.DomainTypes
 open NUnit.Framework
 
 [<SetUp>]

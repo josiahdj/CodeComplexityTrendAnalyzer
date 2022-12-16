@@ -2,7 +2,7 @@
   "profiles": {
     "CodeComplexityTrendAnalyzerApp": {
       "commandName": "Project",
-      "commandLineArgs": "members --repositorypath C:\\code\\FsXaml -s src\\FsXaml.Wpf\\Utilities.fs -o -d \"4/9/2010\""
+      "commandLineArgs": "members --repositorypath C:\\code\\platform -s MoboLogic\\src\\Orders\\Order.cs -o -d \"4/9/2010\""
     }
   }
 }

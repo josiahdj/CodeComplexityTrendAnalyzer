@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Library</OutputType>
-    <TargetFramework>net5.0</TargetFramework>
+    <TargetFramework>net6.0</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
@@ -11,14 +11,21 @@
     <Compile Include="Strings.fs" />
     <Compile Include="Result.fs" />
     <Compile Include="ROP.fs" />
-    <Compile Include="DomainTypes.fs" />
+    <Compile Include="DomainTypes\Git.fs" />
+    <Compile Include="DomainTypes\ComplexityStats.fs" />
+    <Compile Include="DomainTypes\FileComplexityAnalysis.fs" />
+    <Compile Include="DomainTypes\MethodAnalysis.fs" />
+    <Compile Include="LineChange.fs" />
+    <Compile Include="InitialMemberInfo.fs" />
+    <Compile Include="ComplexityStats.fs" />
+    <Compile Include="MemberRevision.fs" />
     <Compile Include="Logging.fs" />
     <Compile Include="Database.fs" />
     <Compile Include="Caching.fs" />
     <Compile Include="Git.fs" />
     <Compile Include="FileComplexityAnalysis.fs" />
     <Compile Include="MethodAnalysis.fs" />
-    <Compile Include="CodeComplexityTrendAnalyzer.fs" />
+    <Compile Include="Program.fs" />
   </ItemGroup>
 
   <ItemGroup>
